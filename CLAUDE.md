@@ -20,7 +20,7 @@ This file is the shared memory for every Claude session on this project. Any age
 ## Current status
 
 - **Phase:** M1 (open, play, export) is built and committed locally, **waiting for Mari to try it.** Next: M2 (frame and style) after Mari's M1 feedback.
-- Git repo on branch `main`, remote `origin` = https://github.com/marihirano/video-editing-tool.git. **Not pushed yet** (ask Mari before the first push). The `gh` tool isn't installed; use plain `git`.
+- Git repo on branch `main`, remote `origin` = https://github.com/marihirano/video-editing-tool.git. Pushed to GitHub on 2026-11-10 (Mari approved). The `gh` tool isn't installed; use plain `git`.
 - **Build the app:** `scripts/build-app.sh` → `build/Video Editing Tool.app` (release build, ad-hoc signed). **Run checks:** `swift run CoreChecks` (project save/reopen, shader compile, layout, a real 1080p hardware export of a generated test video). XCTest and Swift Testing don't run without Xcode, so checks are a plain program.
 - **Screenshots:** the terminal has no screen-recording permission and computer use was off. `VET_SNAPSHOT=/path.png` makes the app save its window, log whether the preview drew video frames (`/path.png.txt`), and quit; launch with `open -n --env VET_SNAPSHOT=… -a "build/Video Editing Tool.app" video.mov`. The Metal preview itself is blank in that picture.
 - **Code map:** `Sources/EditorCore/` = `Settings.swift` (every tunable value), `Project/` (model, save/load, TimeMap), `Render/` (shaders as source text, FrameLayout steps crop → zoom → cursor → frame, FrameRenderer, MetalContext), `Playback/`, `Export/`. `Sources/VideoEditingTool/` = SwiftUI app, `EditorModel`, menus, `Views/`. `Resources/Info.plist` declares the `.vetproj` package type.
@@ -90,7 +90,7 @@ Newest first. Each entry: date, decision, reason.
 
 Newest first. One or two lines per session.
 
-- **2026-11-10** — Built M1: git set up, Swift package (EditorCore library + app + CoreChecks), Metal renderer shared by preview and export, silent playback, hardware MP4 export with progress and cancel, save/reopen `.vetproj` projects with the empty cursor slot, `scripts/build-app.sh`. All checks pass; app verified opening a video from Finder and playing. Not pushed.
+- **2026-11-10** — Built M1: git set up, Swift package (EditorCore library + app + CoreChecks), Metal renderer shared by preview and export, silent playback, hardware MP4 export with progress and cancel, save/reopen `.vetproj` projects with the empty cursor slot, `scripts/build-app.sh`. All checks pass; app verified opening a video from Finder and playing. Pushed after Mari approved.
 
 - **2026-11-10** — Project start. Registered in Project Drive. Researched Screen Studio's features (version 4.1) and built the triage page. Explained features Mari asked about (crop, loupe zoom, inset, hardware encoding). Mari sorted all 78. Estimated effort, then split Now into MVP and phase 2. Explained Swift and native vs web. Wrote FEATURES.md, PLAN.md and this file.
 

@@ -1,0 +1,386 @@
+<title>Video Editing Tool Feature Triage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow working column. Sticky header with a clip-strip
+   progress track (like a timeline) and filters, then grouped feature rows,
+   each with a three-way Now / Future / Never switch. */
+:root {
+  --bg: #f6f6f9;
+  --surface: #ffffff;
+  --fg: #17171f;
+  --muted: #6a6a7c;
+  --line: #e2e2ea;
+  --now: #1d7f52;
+  --now-soft: #e3f3ea;
+  --future: #3461c9;
+  --future-soft: #e5ecfb;
+  --maybe: #a86a12;
+  --maybe-soft: #f8eedb;
+  --never: #7a7a88;
+  --never-soft: #ececf1;
+  --undecided: #d6d6e0;
+  --focus: #3461c9;
+  --font-body: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111116; --surface: #1a1a21; --fg: #ececf2; --muted: #9a9aab; --line: #2b2b35;
+    --now: #4cc58a; --now-soft: #173327; --future: #7fa2f2; --future-soft: #1c2742;
+    --maybe: #e2b25a; --maybe-soft: #3a2e17;
+    --never: #8d8d9c; --never-soft: #26262e; --undecided: #34343f; --focus: #7fa2f2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111116; --surface: #1a1a21; --fg: #ececf2; --muted: #9a9aab; --line: #2b2b35;
+  --now: #4cc58a; --now-soft: #173327; --future: #7fa2f2; --future-soft: #1c2742;
+  --maybe: #e2b25a; --maybe-soft: #3a2e17;
+  --never: #8d8d9c; --never-soft: #26262e; --undecided: #34343f; --focus: #7fa2f2;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body);
+  font-size: 14px; line-height: 1.45;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+.wrap {
+  max-width: 820px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+header.intro { display: grid; gap: 6px; margin-bottom: 20px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.intro p { margin: 0; color: var(--muted); max-width: 62ch; }
+.save-state { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); padding-block: 12px; display: grid; gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.track {
+  display: flex; height: 10px; border-radius: 3px; overflow: hidden;
+  background: var(--undecided); gap: 2px;
+}
+.track span { display: block; height: 100%; transition: flex-grow .25s ease; min-width: 0; }
+.track .t-now { background: var(--now); }
+.track .t-future { background: var(--future); }
+.track .t-maybe { background: var(--maybe); }
+.track .t-never { background: var(--never); }
+.track .t-undecided { background: var(--undecided); }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip {
+  font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--fg); border-radius: 999px; padding: 4px 10px; cursor: pointer;
+  display: inline-flex; gap: 6px; align-items: center;
+}
+.chip .n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip .dot { width: 8px; height: 8px; border-radius: 2px; }
+.chip[aria-pressed="true"] { border-color: var(--fg); }
+.spacer { flex: 1; }
+.copy {
+  font: inherit; font-size: 13px; border: 1px solid var(--line); background: transparent;
+  color: var(--fg); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+}
+
+section.group { margin-top: 28px; }
+.group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.group-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.group-head .note { font-size: 12px; color: var(--muted); }
+.group-head .gcount { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sub { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 4px; }
+ul { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+li.row {
+  display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+  border-top: 1px solid var(--line); border-left: 3px solid transparent;
+}
+li.row:first-child { border-top: 0; }
+li.row[data-status="now"] { border-left-color: var(--now); }
+li.row[data-status="future"] { border-left-color: var(--future); }
+li.row[data-status="maybe"] { border-left-color: var(--maybe); }
+li.row[data-status="never"] { border-left-color: var(--never); }
+li.row[data-status="never"] .label { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--never); }
+.text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.tag {
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 4px; padding: 0 5px;
+}
+.tag.core { color: var(--fg); border-color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+.seg button {
+  font: inherit; font-size: 12px; font-weight: 500; padding: 4px 10px; border: 0;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"][data-v="now"] { background: var(--now-soft); color: var(--now); }
+.seg button[aria-pressed="true"][data-v="future"] { background: var(--future-soft); color: var(--future); }
+.seg button[aria-pressed="true"][data-v="maybe"] { background: var(--maybe-soft); color: var(--maybe); }
+.seg button[aria-pressed="true"][data-v="never"] { background: var(--never-soft); color: var(--fg); }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.empty { color: var(--muted); padding: 24px 0; }
+footer { margin-top: 40px; color: var(--muted); font-size: 12px; }
+footer a { color: inherit; }
+@media (max-width: 520px) {
+  li.row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .seg { align-self: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { .track span { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Feature triage</h1>
+    <p>Every Screen Studio feature, as of version 4.1 (November 2026). Mark each one Now, Future, Maybe or Never. Click a choice again to clear it.</p>
+    <div class="save-state" id="saveState">Connecting…</div>
+  </header>
+
+  <div class="bar">
+    <div class="track" id="track" aria-hidden="true"></div>
+    <div class="filters" id="filters" role="group" aria-label="Show"></div>
+  </div>
+
+  <main id="list"></main>
+
+  <footer>
+    Effort tags: <strong>Core</strong> is what makes it feel like Screen Studio, <strong>Easy</strong> is small to build, <strong>Heavy</strong> needs machine learning, cloud services or a lot of engineering.
+    Sources: <a href="https://screen.studio" target="_blank" rel="noopener">screen.studio</a>, <a href="https://www.screen.studio/roadmap" target="_blank" rel="noopener">roadmap</a>.
+  </footer>
+</div>
+
+<script>
+const GROUPS = [
+  { id: "recording", name: "Recording", items: [
+    ["rec-area", "Record the full display, one window or a custom area", "core"],
+    ["rec-webcam", "Record the webcam at the same time", "core"],
+    ["rec-audio", "Record the microphone and Mac system sound", "core"],
+    ["rec-cursor-data", "Track the cursor and clicks as data, so they can be restyled later", "core"],
+    ["rec-countdown", "Countdown before recording starts", "easy"],
+    ["rec-shortcut", "Global shortcut to start and stop", "easy"],
+    ["rec-pause", "Pause and resume within one take", "easy"],
+    ["rec-resize", "Resize the recorded window to an exact size in one click", "easy"],
+    ["rec-hide-icons", "Hide desktop icons while recording", "easy"],
+    ["rec-notes", "Speaker notes while recording, kept out of the video"],
+    ["rec-autosave", "Autosave every few seconds, with crash recovery"],
+    ["rec-import", "Import an existing video and edit it like a recording"],
+    ["rec-ios", "Record an iPhone or iPad over USB, with no app on the device", "heavy"],
+  ]},
+  { id: "editing", name: "Timeline editing", items: [
+    ["ed-trim", "Trim the start and end", "core"],
+    ["ed-cut", "Cut out sections from the middle", "core"],
+    ["ed-speed", "Speed up sections", "core"],
+    ["ed-typing", "Speed up long typing stretches automatically"],
+    ["ed-crop", "Crop the recording to the part that matters"],
+    ["ed-transcript", "Edit by transcript: delete a sentence to cut it", "heavy"],
+    ["ed-fillers", "Remove filler words and long pauses in one pass", "heavy"],
+    ["ed-undo", "Undo and redo"],
+    ["ed-cmdk", "Command menu (⌘K) to jump to any setting"],
+  ]},
+  { id: "polish", name: "Automatic polish", note: "The signature look", subs: [
+    { name: "Zoom", items: [
+      ["zm-auto", "Zoom in automatically on clicks and typing", "core"],
+      ["zm-manual", "Add, move and edit zooms by hand on the timeline", "core"],
+      ["zm-spring", "Smooth, spring-like zoom animation", "core"],
+      ["zm-loupe", "Loupe zoom: a magnifier bubble instead of zooming the frame"],
+      ["zm-framing", "Smart framing that keeps the webcam off the cursor"],
+      ["zm-upscale", "Upscaling so close-ups stay sharp", "heavy"],
+    ]},
+    { name: "Cursor", items: [
+      ["cu-smooth", "Smoothed cursor paths: shaky movement becomes clean glides", "core"],
+      ["cu-size", "Change cursor size after recording", "core"],
+      ["cu-hires", "High-resolution cursor that stays sharp when large"],
+      ["cu-style", "Change cursor style after recording"],
+      ["cu-blur", "Motion blur on fast movement"],
+      ["cu-click", "Click effects (circle or ripple)"],
+      ["cu-idle", "Hide the cursor when it's idle"],
+      ["cu-loop", "Return the cursor to its start position, for looping videos"],
+      ["cu-keys", "Show keyboard shortcuts on screen as they're pressed"],
+    ]},
+  ]},
+  { id: "style", name: "Frame and style", items: [
+    ["st-bg", "Background: wallpapers, gradients, solid colors, custom images", "core"],
+    ["st-frame", "Padding, rounded corners and a drop shadow", "core"],
+    ["st-inset", "Inset controls"],
+    ["st-unsplash", "Unsplash photos as backgrounds"],
+    ["st-ratios", "Export 16:9, 1:1 and 9:16 from one recording"],
+    ["st-reel", "Reel mode: preview TikTok and Instagram UI over a vertical video"],
+    ["st-device", "Device frame around iPhone and iPad recordings"],
+    ["st-presets", "Save styles as presets and reuse them"],
+  ]},
+  { id: "camera", name: "Camera", items: [
+    ["cam-bubble", "Webcam bubble over the screen recording", "core"],
+    ["cam-layouts", "Layouts: camera only, split, camera over screen, screen only"],
+    ["cam-transitions", "Animated transitions when the layout changes"],
+    ["cam-cutout", "Camera cutout: remove the background behind you", "heavy"],
+    ["cam-silence", "Hide the camera during silence, bring it back when you speak"],
+    ["cam-face", "Face tracking that keeps you centered", "heavy"],
+    ["cam-grade", "Camera color grading and sharpening"],
+  ]},
+  { id: "audio", name: "Audio", items: [
+    ["au-volume", "Volume control for each track", "easy"],
+    ["au-clean", "Voice cleanup and noise reduction", "heavy"],
+    ["au-podcast", "Podcast mode, a voice treatment for walkthroughs"],
+    ["au-clicks", "Click sounds"],
+    ["au-music", "Background music that loops to fit the video"],
+    ["au-voiceover", "AI voiceover from a typed script, with a choice of voices", "heavy"],
+  ]},
+  { id: "captions", name: "Captions and text", items: [
+    ["cap-transcribe", "Automatic transcription, done on the Mac", "heavy"],
+    ["cap-styles", "Captions with several text and animation styles"],
+    ["cap-placement", "Captions placed where they're easy to read"],
+    ["cap-srt", "Export the transcript as an .srt subtitle file"],
+  ]},
+  { id: "privacy", name: "Privacy and focus", items: [
+    ["pv-blur", "Blur or mask sensitive information after recording"],
+    ["pv-spotlight", "Spotlight: dim everything except one area"],
+    ["pv-local", "Process on the Mac, with cloud features opt-in"],
+  ]},
+  { id: "export", name: "Export", items: [
+    ["ex-mp4", "MP4 at 720p, 1080p or 4K, up to 60 fps", "core"],
+    ["ex-gif", "GIF, up to 1080p"],
+    ["ex-prores", "ProRes, for professional editing apps"],
+    ["ex-clipboard", "Copy to the clipboard and paste into Slack, Linear or docs"],
+    ["ex-hw", "Hardware-accelerated encoding on Apple silicon"],
+  ]},
+  { id: "sharing", name: "Sharing and collaboration", note: "Needs a server and accounts", items: [
+    ["sh-links", "Shareable links, hosted up to 1080p at 60 fps"],
+    ["sh-private", "Private links"],
+    ["sh-comments", "Viewer comments at a moment in the video"],
+    ["sh-views", "View counts, which can be hidden"],
+    ["sh-projects", "Shared projects that teammates can edit"],
+    ["sh-presets", "Shared presets, so a team's videos look consistent"],
+  ]},
+  { id: "roadmap", name: "On Screen Studio's roadmap", note: "Not released yet", items: [
+    ["rm-mcp", "MCP server, so AI tools like Claude can drive the app"],
+    ["rm-annotations", "Annotations: arrows, text and shapes over the video"],
+  ]},
+];
+
+const TAG_LABEL = { core: "Core", easy: "Easy", heavy: "Heavy" };
+const STATUSES = [["now", "Now"], ["future", "Future"], ["maybe", "Maybe"], ["never", "Never"]];
+const groupItems = g => g.items || g.subs.flatMap(s => s.items);
+const ALL = GROUPS.flatMap(groupItems);
+
+let decisions = {};          // featureId -> "now" | "future" | "never"
+let filter = "all";
+let db = null;
+let canWrite = true;
+const saveState = document.getElementById("saveState");
+
+function rowHTML([id, text, tag]) {
+  const st = decisions[id] || "";
+  const btns = STATUSES.map(([v, l]) =>
+    `<button type="button" data-id="${id}" data-v="${v}" aria-pressed="${st === v}"${canWrite ? "" : " disabled"}>${l}</button>`).join("");
+  return `<li class="row" data-status="${st}">
+    <div class="text"><span class="label">${text}</span>${tag ? `<span class="tag ${tag}">${TAG_LABEL[tag]}</span>` : ""}</div>
+    <div class="seg" role="group" aria-label="Decision for ${text.replace(/"/g, "&quot;")}">${btns}</div>
+  </li>`;
+}
+const visible = ([id]) => filter === "all" ? true : filter === "undecided" ? !decisions[id] : decisions[id] === filter;
+
+function render() {
+  const counts = { now: 0, future: 0, maybe: 0, never: 0 };
+  ALL.forEach(([id]) => { if (counts[decisions[id]] !== undefined) counts[decisions[id]]++; });
+  const undecided = ALL.length - counts.now - counts.future - counts.maybe - counts.never;
+
+  document.getElementById("track").innerHTML =
+    ["now", "future", "maybe", "never"].map(k => `<span class="t-${k}" style="flex-grow:${counts[k]}"></span>`).join("") +
+    `<span class="t-undecided" style="flex-grow:${undecided}"></span>`;
+
+  const chips = [["all", "All", ALL.length, null], ["undecided", "Undecided", undecided, "var(--undecided)"],
+    ["now", "Now", counts.now, "var(--now)"], ["future", "Future", counts.future, "var(--future)"], ["maybe", "Maybe", counts.maybe, "var(--maybe)"], ["never", "Never", counts.never, "var(--never)"]];
+  document.getElementById("filters").innerHTML = chips.map(([k, l, n, c]) =>
+    `<button type="button" class="chip" data-filter="${k}" aria-pressed="${filter === k}">${c ? `<span class="dot" style="background:${c}"></span>` : ""}${l} <span class="n">${n}</span></button>`
+  ).join("") + `<span class="spacer"></span><button type="button" class="copy" id="copyBtn">Copy summary</button>`;
+
+  let html = "";
+  for (const g of GROUPS) {
+    const items = groupItems(g);
+    const decided = items.filter(([id]) => decisions[id]).length;
+    let body = "";
+    if (g.subs) {
+      for (const s of g.subs) {
+        const vis = s.items.filter(visible);
+        if (vis.length) body += `<div class="sub">${s.name}</div><ul>${vis.map(rowHTML).join("")}</ul>`;
+      }
+    } else {
+      const vis = items.filter(visible);
+      if (vis.length) body = `<ul>${vis.map(rowHTML).join("")}</ul>`;
+    }
+    if (!body) continue;
+    html += `<section class="group"><div class="group-head"><h2>${g.name}</h2>${g.note ? `<span class="note">${g.note}</span>` : ""}<span class="gcount">${decided}/${items.length} decided</span></div>${body}</section>`;
+  }
+  document.getElementById("list").innerHTML = html || `<p class="empty">No features match this filter.</p>`;
+}
+
+function summaryText() {
+  const lines = [];
+  for (const [k, l] of STATUSES) {
+    const items = ALL.filter(([id]) => decisions[id] === k);
+    lines.push(`${l} (${items.length})`);
+    items.forEach(([, t]) => lines.push(`- ${t}`));
+    lines.push("");
+  }
+  return lines.join("\n").trim();
+}
+
+async function setDecision(id, v) {
+  const next = decisions[id] === v ? null : v;
+  const prev = decisions[id];
+  if (next) decisions[id] = next; else delete decisions[id];
+  render();
+  if (!db) { try { localStorage.setItem("triage", JSON.stringify(decisions)); } catch (e) {} return; }
+  saveState.textContent = "Saving…";
+  try {
+    const ref = db.collection("decisions").doc(id);
+    if (next) await ref.set({ status: next, updatedAt: Date.now() }); else await ref.delete();
+    saveState.textContent = "Saved";
+  } catch (e) {
+    if (prev) decisions[id] = prev; else delete decisions[id];
+    render();
+    saveState.textContent = "Couldn't save that change. Check your connection and try again.";
+  }
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.v && b.dataset.id) setDecision(b.dataset.id, b.dataset.v);
+  else if (b.dataset.filter) { filter = b.dataset.filter; render(); }
+  else if (b.id === "copyBtn") {
+    const t = summaryText();
+    navigator.clipboard.writeText(t).then(() => { b.textContent = "Copied"; setTimeout(() => (b.textContent = "Copy summary"), 1500); })
+      .catch(() => { saveState.textContent = "Copy isn't available here. Select the list and copy it instead."; });
+  }
+});
+
+try { decisions = JSON.parse(localStorage.getItem("triage") || "{}"); } catch (e) {}
+render();
+
+(async () => {
+  try { db = window.claude ? await window.claude.use("db") : null; } catch (e) { db = null; }
+  if (!db) { saveState.textContent = "Not connected: choices stay in this browser only."; return; }
+  try {
+    const user = await window.claude.use("user");
+    const w = user ? user.can("data.write") : null;
+    if (w === false) { canWrite = false; saveState.textContent = "View only"; }
+  } catch (e) {}
+  const timer = setTimeout(() => { saveState.textContent = "Still loading saved choices…"; }, 10000);
+  db.collection("decisions").onSnapshot(snap => {
+    clearTimeout(timer);
+    const d = {};
+    snap.docs.forEach(doc => { const s = doc.data()?.status; if (s) d[doc.id] = s; });
+    decisions = d;
+    if (canWrite) saveState.textContent = "Choices save automatically";
+    render();
+  }, () => { clearTimeout(timer); saveState.textContent = "Lost the connection to saved choices. Reload the page to reconnect."; });
+})();
+</script>

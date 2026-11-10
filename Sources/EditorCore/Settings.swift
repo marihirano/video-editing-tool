@@ -66,6 +66,21 @@ public enum Settings {
     // MARK: Preview
     public static let previewMaxFPS = 60
 
+    // MARK: Timeline
+    /// Speed-ups offered in the Speed menu (a custom value can also be typed in).
+    public static let speedPresets: [Double] = [2, 4, 8]
+    public static let customSpeedRange = 1.1...32.0
+    /// Shortest video the trim handles allow, in seconds.
+    public static let minimumKeptSeconds = 0.2
+    /// Thumbnails generated across the recording for the timeline strip.
+    public static let timelineThumbnailCount = 40
+    /// Height of the timeline track, in points.
+    public static let timelineTrackHeight: Double = 56
+    /// Slider drags and handle drags closer together than this count as one undo step.
+    public static let undoCoalesceSeconds = 0.6
+    /// How many edits Undo remembers.
+    public static let undoLimit = 200
+
     // MARK: Export
     /// Video bitrate in bits per second per million output pixels. Screen content has
     /// sharp text, so this is generous: about 16 Mbit/s at 1080p.

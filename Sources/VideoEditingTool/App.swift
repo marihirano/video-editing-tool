@@ -32,5 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in await EditorModel.shared.open(url) }
     }
 
+    /// Quitting with unsaved edits asks first.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated { EditorModel.shared.confirmDiscardChanges() } ? .terminateNow : .terminateCancel
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }

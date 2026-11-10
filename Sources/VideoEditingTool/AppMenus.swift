@@ -17,6 +17,14 @@ struct AppMenus: Commands {
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(model.project == nil)
         }
+        CommandGroup(replacing: .undoRedo) {
+            Button("Undo") { model.undo() }
+                .keyboardShortcut("z")
+                .disabled(!model.canUndo)
+            Button("Redo") { model.redo() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(!model.canRedo)
+        }
         CommandGroup(replacing: .importExport) {
             Button("Export MP4…") { model.startExport() }
                 .keyboardShortcut("e")

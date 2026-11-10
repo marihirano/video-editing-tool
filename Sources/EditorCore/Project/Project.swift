@@ -109,6 +109,7 @@ public struct TimeRange: Codable, Equatable, Sendable {
 public struct SpeedSegment: Codable, Equatable, Sendable {
     public var range: TimeRange
     public var rate: Double
+    public init(range: TimeRange, rate: Double) { self.range = range; self.rate = rate }
 }
 
 public struct ZoomSegment: Codable, Equatable, Sendable {

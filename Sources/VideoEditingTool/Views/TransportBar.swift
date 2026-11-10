@@ -16,13 +16,17 @@ struct TransportBar: View {
             .keyboardShortcut(.space, modifiers: [])
             .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
 
-            Slider(value: Binding(get: { playback.currentTime }, set: { playback.seek(to: $0) }),
-                   in: 0...max(playback.duration, 0.01))
-                .controlSize(.small)
-
-            Text("\(Self.format(playback.currentTime)) / \(Self.format(playback.duration))")
+            // Time in the finished video (after trims, cuts and speed-ups).
+            Text("\(Self.format(playback.outputTime)) / \(Self.format(playback.outputDuration))")
                 .font(.system(.body, design: .monospaced))
                 .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button { model.undo() } label: { Image(systemName: "arrow.uturn.backward") }
+                .help("Undo (⌘Z)").disabled(!model.canUndo)
+            Button { model.redo() } label: { Image(systemName: "arrow.uturn.forward") }
+                .help("Redo (⇧⌘Z)").disabled(!model.canRedo)
 
             Button("Export MP4…") { model.startExport() }
                 .disabled(model.export != nil)
@@ -32,8 +36,9 @@ struct TransportBar: View {
         .background(.bar)
     }
 
-    static func format(_ seconds: Double) -> String {
+    static func format(_ seconds: Double, precise: Bool = false) -> String {
         let s = Int(max(seconds, 0).rounded(.down))
+        if precise { return String(format: "%d:%02d.%d", s / 60, s % 60, Int((max(seconds, 0) * 10).rounded(.down)) % 10) }
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 }

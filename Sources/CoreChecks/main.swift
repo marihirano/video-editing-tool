@@ -54,6 +54,51 @@ do {
     check(abs(pu.contentRect.y - 0.1) < 1e-5 && abs(pu.contentRect.w - 0.8) < 1e-5, "10% padding leaves 10% free above and below")
 }
 
+print("Timeline")
+do {
+    func near(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 1e-6 }
+    var tl = Timeline()
+    check(near(TimeMap(timeline: tl, sourceDuration: 10).outputDuration, 10), "no edits: video is as long as the recording")
+    tl.setTrim(start: 1, end: 9, sourceDuration: 10)       // keep 1–9  (8 s)
+    tl.addCut(TimeRange(start: 3, end: 4))                  // −1 s → 7 s
+    tl.setSpeed(TimeRange(start: 5, end: 7), rate: 4)       // 2 s → 0.5 s → 5.5 s
+    let map = TimeMap(timeline: tl, sourceDuration: 10)
+    check(near(map.outputDuration, 5.5), "trim + cut + 4× speed: 5.5 s long (\(map.outputDuration))")
+    check(near(map.sourceTime(forOutput: 0), 1), "video starts at the trim")
+    check(near(map.sourceTime(forOutput: 2), 3) || near(map.sourceTime(forOutput: 2.0001), 4.0001), "jumps over the cut")
+    check(near(map.sourceTime(forOutput: 2.5), 4.5), "carries on after the cut")
+    check(near(map.sourceTime(forOutput: 3.25), 6), "sped-up part runs 4× faster")
+    check(near(map.sourceTime(forOutput: 5.5), 9), "video ends at the trim")
+    check(near(map.outputTime(forSource: 3.5), 2), "a cut-away moment maps to where the video carries on")
+    check(near(map.outputTime(forSource: 6), 3.25), "output time from source time")
+    var last = -1.0, monotonic = true
+    for i in 0...550 { let s = map.sourceTime(forOutput: Double(i) / 100); if s < last - 1e-9 { monotonic = false }; last = s }
+    check(monotonic, "source time never goes backwards")
+
+    var t2 = tl
+    t2.addCut(TimeRange(start: 3.5, end: 4.5))
+    check(t2.cuts == [TimeRange(start: 3, end: 4.5)], "overlapping cuts merge")
+    t2.setSpeed(TimeRange(start: 6, end: 8), rate: 2)
+    check(t2.speedSegments.count == 2 && near(t2.speedSegments[0].range.end, 6) && t2.speedSegments[1].rate == 2,
+          "new speed replaces the overlapping part of an old one")
+    t2.clearEdits(in: TimeRange(start: 0, end: 10))
+    check(t2.cuts.isEmpty && t2.speedSegments.isEmpty, "restore clears cuts and speed")
+    t2.setTrim(start: 0, end: 10, sourceDuration: 10)
+    check(t2.trim == nil, "trimming to the whole recording means no trim")
+
+    var proj = Project(source: SourceVideo(path: "/x.mov", width: 10, height: 10, duration: 10))
+    proj.timeline = tl
+    let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(proj))
+    check(back.timeline == tl, "trim, cuts and speed survive save and reopen")
+
+    var h = UndoHistory<Int>()
+    let t0 = Date()
+    h.record(0, group: "style", now: t0); h.record(1, group: "style", now: t0 + 0.1); h.record(2, group: "style", now: t0 + 0.2)
+    h.record(3, now: t0 + 0.3)
+    check(h.undo(current: 4) == 3 && h.undo(current: 3) == 0 && !h.canUndo, "one slider drag is one undo step")
+    check(h.redo(current: 0) == 3 && h.redo(current: 3) == 4 && !h.canRedo, "redo brings edits back")
+}
+
 print("Renderer")
 check(MetalContext.shared != nil, "Metal shaders compile at startup")
 var plain = Project(source: SourceVideo(path: "", width: 1440, height: 900, duration: 1))
@@ -117,6 +162,33 @@ do {
     check(near(pixel(272, 112), (255, 0, 255)), "styled export: video's corner is rounded off")
     check(near(pixel(960, 540), (0, 194, 208)), "styled export: video fills the middle")
     check(near(pixel(100, 540), (255, 0, 255)), "styled export: padding strip is background")
+
+    // An edited export: keep 0.2–1.8 s, cut 0.6–1.0 s, play 1.0–1.4 s at 4× → 0.4 + 0.1 + 0.4 = 0.9 s.
+    var edited = Project(source: info.sourceVideo)
+    edited.timeline.setTrim(start: 0.2, end: 1.8, sourceDuration: info.duration)
+    edited.timeline.addCut(TimeRange(start: 0.6, end: 1.0))
+    edited.timeline.setSpeed(TimeRange(start: 1.0, end: 1.4), rate: 4)
+    let expected = TimeMap(project: edited, sourceDuration: info.duration).outputDuration
+    let out3 = tmp.appendingPathComponent("edited.mp4")
+    try await Exporter().export(project: edited, sourceURL: source, to: out3) { _ in }
+    let editedDuration = try await AVURLAsset(url: out3).load(.duration).seconds
+    check(abs(expected - 0.9) < 1e-6 && abs(editedDuration - 0.9) < 0.04, "trimmed, cut and sped-up export is 0.9 s (\(editedDuration))")
+
+    // The test video changes colour every frame, so comparing the middle pixel with the unedited
+    // export (same look) at the matching source moment shows each frame came from the right place.
+    func redAt(_ url: URL, _ t: Double) async throws -> Double {
+        let g = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        g.requestedTimeToleranceBefore = .zero; g.requestedTimeToleranceAfter = .zero
+        let (img, _) = try await g.image(at: CMTime(seconds: t, preferredTimescale: 600))
+        return Double(NSBitmapImageRep(cgImage: img).colorAt(x: 960, y: 540)!.usingColorSpace(.sRGB)!.redComponent * 255)
+    }
+    var rightFrames = true, report = ""
+    for (outT, srcT) in [(0.05, 0.25), (0.3, 0.5), (0.45, 1.2), (0.7, 1.6)] {
+        let got = try await redAt(out3, outT), want = try await redAt(out, srcT)
+        report += String(format: " %.0f/%.0f", got, want)
+        if abs(got - want) > 6 { rightFrames = false }
+    }
+    check(rightFrames, "edited export shows the right moments (red got/expected:\(report))")
 }
 
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")

@@ -14,6 +14,8 @@ struct ContentView: View {
                 } else {
                     PreviewArea()
                     TransportBar()
+                    Divider()
+                    TimelineView()
                 }
             }
             if model.project != nil {
@@ -22,6 +24,7 @@ struct ContentView: View {
             }
         }
         .background(Color(rgba: Settings.previewSurround))
+        .background(WindowCloseGuard())
         .navigationTitle(model.displayName)
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first else { return false }

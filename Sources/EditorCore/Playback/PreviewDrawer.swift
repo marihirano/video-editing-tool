@@ -8,6 +8,8 @@ public final class PreviewDrawer: NSObject, MTKViewDelegate {
     private let playback: PlaybackController
     /// Read every frame, so edits show up immediately.
     public var project: Project?
+    /// How many preview frames showed real video (used by the debug snapshot).
+    public private(set) var videoFramesDrawn = 0
 
     public init(renderer: FrameRenderer, playback: PlaybackController) {
         self.renderer = renderer
@@ -34,6 +36,7 @@ public final class PreviewDrawer: NSObject, MTKViewDelegate {
             let size = CGSize(width: CVPixelBufferGetWidth(frame.buffer), height: CVPixelBufferGetHeight(frame.buffer))
             let u = FrameLayout.uniforms(project: project, sourceSize: size, sourceTime: frame.time)
             renderer.encode(frame: frame.buffer, uniforms: u, into: drawable.texture, commandBuffer: cb)
+            videoFramesDrawn += 1
         } else {
             renderer.encodeClear(project?.style.background ?? Settings.defaultBackground, into: drawable.texture, commandBuffer: cb)
         }

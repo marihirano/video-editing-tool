@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import EditorCore
 import Foundation
@@ -30,9 +31,34 @@ do {
     check(p.output.fps == Settings.defaultOutputFPS && p.timeline.cuts.isEmpty, "older or partial files still open")
 }
 
+print("Style")
+do {
+    var st = FrameStyle()
+    st.kind = .image; st.imagePath = "/tmp/x.png"; st.padding = 12.5; st.cornerRadius = 30
+    st.shadowOpacity = 0.7; st.shadowBlur = 55; st.shadowOffset = 9; st.wallpaper = 3
+    st.gradientStart = RGBAColor(hex: 0x123456); st.gradientAngle = 200
+    var proj = Project(source: SourceVideo(path: "/x.mov", width: 10, height: 10, duration: 1))
+    proj.style = st
+    let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(proj))
+    check(back.style == st, "style survives save and reopen")
+
+    let m1 = #"{"source":{"path":"/x.mov","width":10,"height":10,"duration":1},"style":{"background":{"r":0,"g":0,"b":0,"a":1}}}"#
+    let old = try JSONDecoder().decode(Project.self, from: Data(m1.utf8))
+    check(old.style.padding == Settings.defaultPadding && old.style.cornerRadius == Settings.defaultCornerRadius
+          && old.style.kind == Settings.defaultBackgroundKind && old.style.background.r == 0,
+          "M1 project (only `background`) opens with default look")
+
+    var padded = Project(source: SourceVideo(path: "", width: 1440, height: 900, duration: 1))
+    padded.style.padding = 10
+    let pu = FrameLayout.uniforms(project: padded, sourceSize: CGSize(width: 1440, height: 900), sourceTime: 0)
+    check(abs(pu.contentRect.y - 0.1) < 1e-5 && abs(pu.contentRect.w - 0.8) < 1e-5, "10% padding leaves 10% free above and below")
+}
+
 print("Renderer")
 check(MetalContext.shared != nil, "Metal shaders compile at startup")
-let u = FrameLayout.uniforms(project: Project(source: SourceVideo(path: "", width: 1440, height: 900, duration: 1)),
+var plain = Project(source: SourceVideo(path: "", width: 1440, height: 900, duration: 1))
+plain.style.padding = 0
+let u = FrameLayout.uniforms(project: plain,
                              sourceSize: CGSize(width: 1440, height: 900), sourceTime: 0)
 check(abs(u.contentRect.z - Float(1.6 / (16.0 / 9.0))) < 1e-5 && u.contentRect.w == 1, "16:10 video fits a 16:9 canvas, centred")
 
@@ -58,6 +84,39 @@ do {
     check(audio.isEmpty, "MP4 is silent")
     check(exporter.usedHardwareEncoder, "hardware encoder used")
     print(String(format: "  info took %.2fs, %.0f fps, file: %@", Date().timeIntervalSince(start), frames, out.path))
+
+    if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] {
+        let g = AVAssetImageGenerator(asset: asset)
+        let (img, _) = try await g.image(at: CMTime(seconds: 1, preferredTimescale: 60))
+        try NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])?
+            .write(to: URL(fileURLWithPath: dir).appendingPathComponent("default-frame.png"))
+    }
+    // A styled export: 10% padding, big corners, plain magenta background, no shadow.
+    var styled = Project(source: info.sourceVideo)
+    styled.style.kind = .solid
+    styled.style.background = RGBAColor(r: 1, g: 0, b: 1, a: 1)
+    styled.style.padding = 10; styled.style.cornerRadius = 60; styled.style.shadowOpacity = 0
+    let out2 = tmp.appendingPathComponent("styled.mp4")
+    try await Exporter().export(project: styled, sourceURL: source, to: out2) { _ in }
+    let gen = AVAssetImageGenerator(asset: AVURLAsset(url: out2))
+    gen.requestedTimeToleranceBefore = .zero; gen.requestedTimeToleranceAfter = .zero
+    let (cg, _) = try await gen.image(at: .zero)
+    if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] {
+        let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+        try png?.write(to: URL(fileURLWithPath: dir).appendingPathComponent("styled-frame.png"))
+    }
+    func pixel(_ x: Int, _ y: Int) -> (Int, Int, Int) {
+        let rep = NSBitmapImageRep(cgImage: cg)
+        let c = rep.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
+        return (Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255))
+    }
+    func near(_ a: (Int, Int, Int), _ b: (Int, Int, Int)) -> Bool {
+        abs(a.0 - b.0) + abs(a.1 - b.1) + abs(a.2 - b.2) < 90
+    }
+    check(near(pixel(5, 5), (255, 0, 255)), "styled export: canvas corner is background")
+    check(near(pixel(272, 112), (255, 0, 255)), "styled export: video's corner is rounded off")
+    check(near(pixel(960, 540), (0, 194, 208)), "styled export: video fills the middle")
+    check(near(pixel(100, 540), (255, 0, 255)), "styled export: padding strip is background")
 }
 
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")

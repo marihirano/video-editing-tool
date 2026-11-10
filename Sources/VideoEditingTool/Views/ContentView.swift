@@ -7,12 +7,18 @@ struct ContentView: View {
     @State private var isDropTargeted = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            if model.project == nil {
-                EmptyStateView(isTargeted: isDropTargeted)
-            } else {
-                PreviewArea()
-                TransportBar()
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                if model.project == nil {
+                    EmptyStateView(isTargeted: isDropTargeted)
+                } else {
+                    PreviewArea()
+                    TransportBar()
+                }
+            }
+            if model.project != nil {
+                Divider()
+                InspectorView()
             }
         }
         .background(Color(rgba: Settings.previewSurround))
@@ -44,8 +50,7 @@ struct PreviewArea: View {
             if let drawer = model.drawer {
                 PreviewView(drawer: drawer)
                     .aspectRatio(CGFloat(output.width) / CGFloat(output.height), contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 Text("Preview unavailable").foregroundStyle(.secondary)
             }

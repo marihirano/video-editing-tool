@@ -126,10 +126,50 @@ public struct CropRect: Codable, Equatable, Sendable {
     public var x: Double, y: Double, width: Double, height: Double
 }
 
-/// The frame around the video (M2 adds padding, corners, shadow and wallpapers).
+public enum BackgroundKind: String, Codable, CaseIterable, Sendable {
+    case wallpaper, gradient, solid, image
+}
+
+/// The frame around the video: background, padding, rounded corners and drop shadow.
+/// Every field has a default, so older project files (which only had `background`) still open.
 public struct FrameStyle: Codable, Equatable, Sendable {
+    public var kind: BackgroundKind = Settings.defaultBackgroundKind
+    /// The plain colour (also the key M1 projects used).
     public var background: RGBAColor = Settings.defaultBackground
+    public var gradientStart: RGBAColor = Settings.gradients[Settings.defaultGradient].start
+    public var gradientEnd: RGBAColor = Settings.gradients[Settings.defaultGradient].end
+    public var gradientAngle: Double = Settings.defaultGradientAngle
+    public var wallpaper: Int = Settings.defaultWallpaper
+    /// The user's own background picture (absolute path to the file).
+    public var imagePath: String? = nil
+    public var padding: Double = Settings.defaultPadding
+    public var cornerRadius: Double = Settings.defaultCornerRadius
+    public var shadowOpacity: Double = Settings.defaultShadowOpacity
+    public var shadowBlur: Double = Settings.defaultShadowBlur
+    public var shadowOffset: Double = Settings.defaultShadowOffset
     public init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case kind, background, gradientStart, gradientEnd, gradientAngle, wallpaper, imagePath
+        case padding, cornerRadius, shadowOpacity, shadowBlur, shadowOffset
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = FrameStyle()
+        kind = try c.decodeIfPresent(BackgroundKind.self, forKey: .kind) ?? d.kind
+        background = try c.decodeIfPresent(RGBAColor.self, forKey: .background) ?? d.background
+        gradientStart = try c.decodeIfPresent(RGBAColor.self, forKey: .gradientStart) ?? d.gradientStart
+        gradientEnd = try c.decodeIfPresent(RGBAColor.self, forKey: .gradientEnd) ?? d.gradientEnd
+        gradientAngle = try c.decodeIfPresent(Double.self, forKey: .gradientAngle) ?? d.gradientAngle
+        wallpaper = try c.decodeIfPresent(Int.self, forKey: .wallpaper) ?? d.wallpaper
+        imagePath = try c.decodeIfPresent(String.self, forKey: .imagePath)
+        padding = try c.decodeIfPresent(Double.self, forKey: .padding) ?? d.padding
+        cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? d.cornerRadius
+        shadowOpacity = try c.decodeIfPresent(Double.self, forKey: .shadowOpacity) ?? d.shadowOpacity
+        shadowBlur = try c.decodeIfPresent(Double.self, forKey: .shadowBlur) ?? d.shadowBlur
+        shadowOffset = try c.decodeIfPresent(Double.self, forKey: .shadowOffset) ?? d.shadowOffset
+    }
 }
 
 /// Empty slot for phase 2's cursor data.

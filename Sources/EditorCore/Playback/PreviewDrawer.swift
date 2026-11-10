@@ -35,10 +35,10 @@ public final class PreviewDrawer: NSObject, MTKViewDelegate {
         if let project, let frame = playback.frameForDisplay() {
             let size = CGSize(width: CVPixelBufferGetWidth(frame.buffer), height: CVPixelBufferGetHeight(frame.buffer))
             let u = FrameLayout.uniforms(project: project, sourceSize: size, sourceTime: frame.time)
-            renderer.encode(frame: frame.buffer, uniforms: u, into: drawable.texture, commandBuffer: cb)
+            renderer.encode(frame: frame.buffer, uniforms: u, backgroundImagePath: project.style.kind == .image ? project.style.imagePath : nil, into: drawable.texture, commandBuffer: cb)
             videoFramesDrawn += 1
         } else {
-            renderer.encodeClear(project?.style.background ?? Settings.defaultBackground, into: drawable.texture, commandBuffer: cb)
+            renderer.encodeClear(Settings.previewSurround, into: drawable.texture, commandBuffer: cb)
         }
         cb.present(drawable)
         cb.commit()

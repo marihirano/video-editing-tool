@@ -109,7 +109,7 @@ public final class Exporter: @unchecked Sendable {
             let size = CGSize(width: CVPixelBufferGetWidth(frame), height: CVPixelBufferGetHeight(frame))
             let uniforms = FrameLayout.uniforms(project: project, sourceSize: size,
                                                 sourceTime: sample.presentationTimeStamp.seconds - info.start)
-            renderer.encode(frame: frame, uniforms: uniforms, into: target, commandBuffer: cb)
+            renderer.encode(frame: frame, uniforms: uniforms, backgroundImagePath: project.style.kind == .image ? project.style.imagePath : nil, into: target, commandBuffer: cb)
             cb.commit()
             cb.waitUntilCompleted()
             _ = targetRef

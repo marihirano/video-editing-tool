@@ -33,4 +33,11 @@ enum FilePanels {
         panel.nameFieldStringValue = suggestedName
         return panel.runModal() == .OK ? panel.url : nil
     }
+
+    static func chooseBackgroundImage() -> URL? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.message = "Choose a picture for the background"
+        return panel.runModal() == .OK ? panel.url : nil
+    }
 }

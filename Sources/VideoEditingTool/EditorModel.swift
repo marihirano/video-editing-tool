@@ -10,6 +10,8 @@ final class EditorModel: ObservableObject {
     @Published private(set) var project: Project? { didSet { drawer?.project = project } }
     @Published private(set) var sourceURL: URL?
     @Published private(set) var projectURL: URL?
+    /// True once the style has been changed since opening or saving. (Undo comes in M3.)
+    @Published private(set) var hasUnsavedChanges = false
     @Published var errorMessage: String?
     @Published var export: ExportState?
 
@@ -28,6 +30,15 @@ final class EditorModel: ObservableObject {
         self.playback = playback
         drawer = MetalContext.shared.map { PreviewDrawer(renderer: FrameRenderer(context: $0), playback: playback) }
         if drawer == nil { errorMessage = "This Mac's graphics chip couldn't be used for the preview." }
+    }
+
+    /// Changes the frame style (background, padding, corners, shadow); the preview updates at once.
+    func updateStyle(_ change: (inout FrameStyle) -> Void) {
+        guard var p = project else { return }
+        change(&p.style)
+        guard p != project else { return }
+        project = p
+        hasUnsavedChanges = true
     }
 
     /// Name shown in the window title.
@@ -69,6 +80,7 @@ final class EditorModel: ObservableObject {
     private func show(_ project: Project, source: VideoInfo, projectURL: URL?) {
         playback.pause()
         self.project = project
+        hasUnsavedChanges = false
         self.sourceURL = source.url
         self.projectURL = projectURL
         playback.load(source)
@@ -93,6 +105,7 @@ final class EditorModel: ObservableObject {
         do {
             try ProjectStore.save(project, sourceURL: sourceURL, to: url)
             projectURL = url
+            hasUnsavedChanges = false
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
         } catch {
             errorMessage = "Couldn't save the project. \(error.localizedDescription)"

@@ -1,5 +1,6 @@
 import CoreVideo
 import Metal
+import MetalKit
 
 /// The one renderer used by both the preview and the export, so what you see is what you get.
 /// Give it a decoded video frame and a target texture; it draws the finished frame.
@@ -8,6 +9,11 @@ public final class FrameRenderer {
     public let context: MetalContext
     let queue: MTLCommandQueue
     private var textureCache: CVMetalTextureCache?
+    private var imageCache: [String: MTLTexture] = [:]
+    private lazy var placeholder: MTLTexture = {
+        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: MetalContext.pixelFormat, width: 1, height: 1, mipmapped: false)
+        return context.device.makeTexture(descriptor: d)!
+    }()
 
     public init(context: MetalContext) {
         self.context = context
@@ -30,8 +36,19 @@ public final class FrameRenderer {
         return (tex, cvTex)
     }
 
+    /// The user's background picture as a texture (cached), or a 1×1 stand-in if there is none.
+    func backgroundTexture(path: String?) -> MTLTexture {
+        guard let path else { return placeholder }
+        if let t = imageCache[path] { return t }
+        let options: [MTKTextureLoader.Option: Any] = [.SRGB: false, .origin: MTKTextureLoader.Origin.topLeft]
+        guard let t = try? MTKTextureLoader(device: context.device).newTexture(URL: URL(fileURLWithPath: path), options: options)
+        else { return placeholder }
+        imageCache[path] = t
+        return t
+    }
+
     /// Encodes drawing one finished frame into `target`. The caller commits the command buffer.
-    public func encode(frame pixelBuffer: CVPixelBuffer, uniforms: FrameUniforms,
+    public func encode(frame pixelBuffer: CVPixelBuffer, uniforms: FrameUniforms, backgroundImagePath: String? = nil,
                        into target: MTLTexture, commandBuffer: MTLCommandBuffer) {
         guard let (sourceTex, cvTex) = texture(for: pixelBuffer) else { return }
         let pass = MTLRenderPassDescriptor()
@@ -43,6 +60,7 @@ public final class FrameRenderer {
         enc.setRenderPipelineState(context.framePipeline)
         enc.setFragmentBytes(&u, length: MemoryLayout<FrameUniforms>.stride, index: 0)
         enc.setFragmentTexture(sourceTex, index: 0)
+        enc.setFragmentTexture(backgroundTexture(path: backgroundImagePath), index: 1)
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc.endEncoding()
         // Keep the wrapped frame alive until the GPU is done with it.

@@ -92,8 +92,8 @@ public enum Settings {
     public static let zoomScaleRange = 1.1...4.0
     /// Clicking the empty zoom track adds a zoom this long: a share of the video's length,
     /// kept between the range's ends (seconds of finished video).
-    public static let clickZoomFractionOfVideo = 0.05
-    public static let clickZoomSecondsRange = 1.0...2.0
+    public static let clickZoomFractionOfVideo = 0.10
+    public static let clickZoomSecondsRange = 1.0...10.0
     /// Shortest zoom, in seconds of finished video.
     public static let minimumZoomSeconds = 0.3
     /// Easing presets: transition = seconds for the zoom-in (and again for the zoom-out),

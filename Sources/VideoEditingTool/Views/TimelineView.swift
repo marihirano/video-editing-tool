@@ -7,7 +7,7 @@ import SwiftUI
 /// The gray line is the playhead; the blue line follows the mouse (the preview shows that
 /// moment) and stays where you click. With the scissors tool out, a click cuts there.
 /// Clicking a clip or a zoom selects it and shows its settings in the side panel.
-/// On the zoom track: click empty space to add a zoom of a second or two (a "+" placeholder shows
+/// On the zoom track: click empty space to add a zoom (10% of the video) (a "+" placeholder shows
 /// where while hovering), or drag across it to add one of any length; drag a zoom to move it,
 /// drag its ends to make it longer or shorter.
 struct TimelineView: View {
@@ -137,7 +137,7 @@ struct TimelineView: View {
             case .active(let p):
                 model.hover(at: t(p.x))
                 // Pointer hints on the zoom track: ↔ on a zoom's ends, an open hand on a zoom, and on empty
-                // space a pointing hand with a "+" placeholder showing the zoom a click would add.
+                // space a "+" placeholder showing the zoom a click would add.
                 guard !model.isCutMode, drag == nil else { placeholder = nil; break }
                 if onZoomTrack(p.y) {
                     switch zoomHit(p.x)?.1 {
@@ -145,7 +145,7 @@ struct TimelineView: View {
                     case .body?: placeholder = nil; NSCursor.openHand.set()
                     case nil:
                         placeholder = map.flatMap { model.project?.timeline.clickZoomRange(atOutput: t(p.x), map: $0) }
-                        (placeholder == nil ? NSCursor.arrow : NSCursor.pointingHand).set()
+                        NSCursor.arrow.set()
                     }
                 } else {
                     placeholder = nil

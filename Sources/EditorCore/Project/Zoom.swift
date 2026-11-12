@@ -44,7 +44,7 @@ extension Timeline {
     }
 
     /// The zoom a click at output moment `t` on the empty zoom track would add: it starts at `t` and
-    /// lasts a second or two (longer videos get longer zooms). If the next zoom or the end of the video
+    /// lasts 10% of the video (at least 1 s). If the next zoom or the end of the video
     /// is too close, it moves earlier or gets shorter to fit. Nil if there's no room (or `t` is on a zoom).
     public func clickZoomRange(atOutput t: Double, map: TimeMap) -> TimeRange? {
         guard let gap = freeGap(around: t, map: map) else { return nil }

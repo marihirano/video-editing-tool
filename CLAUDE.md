@@ -59,7 +59,7 @@ node ~/design-project-drive/sweep.mjs add --type <type> --url <url> --label "<sh
 ```
 
 - **Already filed:** the local folder; the GitHub repo. (Mari removed the triage page from the drive on 2026-11-10; don't re-add it.)
-- **Figma:** the design file `dpKwm3o8JehmFtDaPWkxTt` (still named "video-editing-tool" in Figma) and the FigJam Sprints page are in Mari's reflections with `#video-editor`, so the nightly sweep files them.
+- **Figma:** the design file `dpKwm3o8JehmFtDaPWkxTt` (Mari renames it to "video-editor" in Figma; plugin code cannot rename files) and the FigJam Sprints page are in Mari's reflections with `#video-editor`, so the nightly sweep files them.
 - **To file when created:** any deployments.
 - Mari tags this project's links in her daily reflections with `#video-editor`.
 

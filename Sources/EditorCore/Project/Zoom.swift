@@ -155,11 +155,13 @@ public struct ZoomCamera: Sendable {
         return (1, p.zoom)
     }
 
-    /// The part of `cropped` (source pixels) visible at output moment `t`.
-    public func visibleRect(atOutput t: Double, cropped: CGRect) -> CGRect {
+    /// The part of `cropped` visible at output moment `t`. `target` says what a zoom shows once
+    /// it's fully in (by default `targetRect`); the renderer passes a target on the whole canvas.
+    public func visibleRect(atOutput t: Double, cropped: CGRect,
+                            target: ((ZoomSegment) -> CGRect)? = nil) -> CGRect {
         let (w, zoom) = weight(atOutput: t)
         guard let zoom, w > 0 else { return cropped }
-        let target = Self.targetRect(zoom, cropped: cropped)
+        let target = target?(zoom) ?? Self.targetRect(zoom, cropped: cropped)
         // Zoom about the one point that stays still between the whole frame and the target,
         // so the content grows towards it without drifting sideways.
         let S = max(zoom.scale, 1.0001)
@@ -168,6 +170,19 @@ public struct ZoomCamera: Sendable {
         let s = max(1, exp(w * log(S)))   // even steps in perceived size
         return CGRect(x: anchor.x + (cropped.minX - anchor.x) / s, y: anchor.y + (cropped.minY - anchor.y) / s,
                       width: cropped.width / s, height: cropped.height / s)
+    }
+
+    /// What a zoom shows once fully in, on the whole canvas (fractions 0–1): `1/scale` of the canvas
+    /// around the zoom's point on the video (`content` = where the video sits). It stays over the
+    /// video where it fits, so a zoom fills the picture with video, not background.
+    public static func canvasTarget(_ zoom: ZoomSegment, content: CGRect) -> CGRect {
+        let size = 1 / max(zoom.scale, 1)
+        func axis(_ c: Double, _ lo: CGFloat, _ len: CGFloat) -> CGFloat {
+            guard size <= len else { return lo + len / 2 - size / 2 }   // wider than the video: centre on it
+            return min(max(lo + CGFloat(c) * len - size / 2, lo), lo + len - size)
+        }
+        return CGRect(x: axis(zoom.centerX, content.minX, content.width), y: axis(zoom.centerY, content.minY, content.height),
+                      width: size, height: size)
     }
 
     /// What a zoom shows once it's fully in: `1/scale` of the frame around its point, kept inside the frame.

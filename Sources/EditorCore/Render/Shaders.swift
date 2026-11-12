@@ -15,6 +15,7 @@ enum Shaders {
         float4 sourceRect;   // which part of the source frame to show, 0–1, origin top-left
         float4 shape;        // corner radius, shadow opacity, shadow blur, shadow offset (pixels)
         float4 canvas;       // canvas size in pixels
+        float4 camera;       // part of the canvas in view (zoom), 0–1
     };
 
     struct VOut { float4 position [[position]]; float2 uv; };
@@ -72,7 +73,8 @@ enum Shaders {
                                   texture2d<float> source [[texture(0)]],
                                   texture2d<float> backgroundImage [[texture(1)]]) {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
-        float4 color = backgroundColor(in.uv, u, backgroundImage);
+        // The background zooms with everything else.
+        float4 color = backgroundColor(u.camera.xy + in.uv * u.camera.zw, u, backgroundImage);
 
         // Geometry in canvas pixels.
         float2 px = in.uv * u.canvas.xy;

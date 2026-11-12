@@ -174,6 +174,19 @@ do {
     let edge = ZoomCamera.targetRect(ZoomSegment(range: TimeRange(start: 0, end: 1), centerX: 1, centerY: 0, scale: 2), cropped: frame)
     check(edge == CGRect(x: 500, y: 0, width: 500, height: 250), "zooming at a corner stays inside the frame")
 
+    // Zoom is a camera on the whole picture: fully zoomed, the framed video grows past the canvas edges.
+    var padded = Project(source: SourceVideo(path: "/x.mov", width: 1440, height: 900, duration: 10))
+    padded.style.padding = 10
+    padded.timeline.zooms = [ZoomSegment(range: TimeRange(start: 1, end: 5), centerX: 0.5, centerY: 0.5, scale: 2, transition: 1, bounce: 0)]
+    let zu = FrameLayout.uniforms(project: padded, sourceSize: CGSize(width: 1440, height: 900), outputTime: 3)
+    let r0 = FrameLayout.uniforms(project: padded, sourceSize: CGSize(width: 1440, height: 900), outputTime: 0)
+    check(zu.contentRect.y < 0 && zu.contentRect.y + zu.contentRect.w > 1 && zu.sourceRect == r0.sourceRect,
+          "fully zoomed: the whole frame grows past the picture's edges (video not re-cropped)")
+    check(abs(zu.shape.x - 2 * r0.shape.x) < 1e-4 && abs(zu.camera.z - 0.5) < 1e-6, "corners and shadow grow with the zoom; background zooms too")
+    padded.timeline.zooms[0].centerX = 0; padded.timeline.zooms[0].centerY = 0
+    let zc = FrameLayout.uniforms(project: padded, sourceSize: CGSize(width: 1440, height: 900), outputTime: 3)
+    check(abs(zc.contentRect.x) < 1e-5 && abs(zc.contentRect.y) < 1e-5, "zooming at a corner lines the video's corner up with the picture's (no background)")
+
     // Save and reopen.
     var proj = Project(source: SourceVideo(path: "/x.mov", width: 1440, height: 900, duration: 10))
     proj.timeline.zooms = [ZoomSegment(range: TimeRange(start: 1, end: 3), centerX: 0.2, centerY: 0.8, scale: 2.5, transition: 0.7, bounce: 0.3)]
@@ -317,6 +330,21 @@ do {
     check(cropOK, "crop export shows the cropped part (colour differences:\(cropR))")
     let (zoomOK, zoomR) = try await matches(out5, at: 1, [((960, 540), (192, 120)), ((960, 900), (192, 160)), ((528, 540), (144, 120)), ((1392, 540), (240, 120))])
     check(zoomOK, "zoom export shows 2× around the point (colour differences:\(zoomR))")
+    // Example frames of a zoom with the default look, for eyeballing (only with VET_CHECK_FRAME_DIR).
+    if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] {
+        var look = Project(source: info.sourceVideo)
+        look.timeline.zooms = [ZoomSegment(range: TimeRange(start: 0, end: 2), centerX: 0.7, centerY: 0.3, scale: 1.5, transition: 0.8, bounce: 0)]
+        let out6 = tmp.appendingPathComponent("look.mp4")
+        try await Exporter().export(project: look, sourceURL: source, to: out6) { _ in }
+        let g = AVAssetImageGenerator(asset: AVURLAsset(url: out6))
+        g.maximumSize = CGSize(width: 640, height: 0)
+        g.requestedTimeToleranceBefore = .zero; g.requestedTimeToleranceAfter = .zero
+        for t in [0.0, 0.2, 0.4, 1.0] {
+            let (img, _) = try await g.image(at: CMTime(seconds: t, preferredTimescale: 600))
+            try NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: dir).appendingPathComponent("zoom-look-\(t).png"))
+        }
+    }
     let (startOK, startR) = try await matches(out5, at: 0, [((960, 900), (192, 200)), ((528, 540), (96, 120))])
     check(startOK, "zoom export starts un-zoomed (colour differences:\(startR))")
 }

@@ -20,10 +20,14 @@ final class EditorModel: ObservableObject {
     /// The project as last opened or saved, to tell whether there are unsaved changes.
     @Published private var savedProject: Project?
     @Published private var history = UndoHistory<Project>()
-    /// Part of the recording picked on the timeline (source seconds), for Cut and Speed.
-    @Published var selection: TimeRange?
-    /// Pictures for the timeline strip, evenly spaced across the recording.
-    @Published private(set) var thumbnails: [CGImage?] = []
+    /// The blue line: where the mouse is over the timeline (finished-video seconds), or nil.
+    @Published private(set) var hoverTime: Double?
+    /// The blue line when not hovering: the last clicked spot (finished-video seconds). Split happens here.
+    @Published private(set) var editTime: Double?
+    /// The clip last clicked (highlighted), by its position on the timeline.
+    @Published var selectedClip: Int?
+    /// Clip waiting for a typed-in custom speed (shows the Custom speed box).
+    @Published var customSpeedClip: Int?
     @Published var errorMessage: String?
     @Published var export: ExportState?
 
@@ -77,40 +81,53 @@ final class EditorModel: ObservableObject {
         edit(group: "style") { change(&$0.style) }
     }
 
-    // MARK: Timeline edits (all times are source seconds)
+    // MARK: Timeline (positions are finished-video seconds)
 
-    func setTrim(start: Double, end: Double) {
+    var clips: [Clip] { project?.timeline.resolvedClips(sourceDuration: sourceDuration) ?? [] }
+
+    /// Where the blue line is drawn: under the mouse, else the clicked spot.
+    var blueLineTime: Double? { hoverTime ?? editTime }
+
+    /// Mouse over the timeline: the blue line follows and the preview shows that moment.
+    func hover(at t: Double?) {
+        hoverTime = t
+        guard let map = timeMap else { return }
+        if let t { playback.skim(to: map.sourceTime(forOutput: t)) } else { playback.endSkim() }
+    }
+
+    /// Click (or drag) on the timeline: pins the blue line and moves the playhead there.
+    func setEditPoint(_ t: Double) {
+        guard let map = timeMap else { return }
+        let t = min(max(t, 0), map.outputDuration)
+        editTime = t
+        playback.seek(to: map.sourceTime(forOutput: t))
+    }
+
+    /// Scissors: splits the clip under the blue line (or the playhead if no line is set).
+    func splitAtEditPoint() {
+        guard project != nil else { return }
+        let t = blueLineTime ?? playback.outputTime
         let d = sourceDuration
-        edit(group: "trim") { $0.timeline.setTrim(start: start, end: end, sourceDuration: d) }
+        edit { $0.timeline.split(atOutput: t, sourceDuration: d) }
     }
 
-    func trimStartToPlayhead() {
-        guard let kept = project?.timeline.keptRange(sourceDuration: sourceDuration) else { return }
-        edit { [d = sourceDuration, t = playback.currentTime] in $0.timeline.setTrim(start: t, end: kept.end, sourceDuration: d) }
+    func deleteClip(_ i: Int) {
+        let d = sourceDuration
+        edit { $0.timeline.deleteClip(i, sourceDuration: d) }
+        selectedClip = nil
+        // Keep the blue line and playhead inside the shorter video.
+        if let map = timeMap {
+            if let e = editTime { editTime = min(e, map.outputDuration) }
+            playback.seek(to: map.sourceTime(forOutput: min(playback.outputTime, map.outputDuration)))
+        }
     }
 
-    func trimEndToPlayhead() {
-        guard let kept = project?.timeline.keptRange(sourceDuration: sourceDuration) else { return }
-        edit { [d = sourceDuration, t = playback.currentTime] in $0.timeline.setTrim(start: kept.start, end: t, sourceDuration: d) }
-    }
-
-    func resetTrim() { edit { $0.timeline.trim = nil } }
-
-    func cutSelection() {
-        guard let sel = selection else { return }
-        edit { $0.timeline.addCut(sel) }
-        selection = nil
-    }
-
-    func setSpeedOfSelection(_ rate: Double) {
-        guard let sel = selection else { return }
-        edit { $0.timeline.setSpeed(sel, rate: rate) }
-    }
-
-    /// Puts back cut parts and normal speed inside the selection.
-    func restoreSelection() {
-        guard let sel = selection else { return }
-        edit { $0.timeline.clearEdits(in: sel) }
+    func setSpeed(_ rate: Double, ofClip i: Int) {
+        let d = sourceDuration
+        let src = editTime.flatMap { timeMap?.sourceTime(forOutput: $0) }
+        edit { $0.timeline.setRate(rate, ofClip: i, sourceDuration: d) }
+        // The video's clock changed; keep the blue line on the same recorded moment.
+        if let src, let map = timeMap { editTime = map.outputTime(forSource: src) }
     }
 
     /// Name shown in the window title.
@@ -156,16 +173,10 @@ final class EditorModel: ObservableObject {
         self.project = project
         savedProject = project
         history.reset()
-        selection = nil
-        thumbnails = []
+        hoverTime = nil; editTime = nil; selectedClip = nil
         self.sourceURL = source.url
         self.projectURL = projectURL
         playback.load(source)
-        Task {
-            let images = await Thumbnails.generate(url: source.url, duration: source.duration,
-                                                   count: Settings.timelineThumbnailCount, maxHeight: Settings.timelineTrackHeight * 2)
-            if sourceURL == source.url { thumbnails = images }
-        }
         if projectURL == nil { NSDocumentController.shared.noteNewRecentDocumentURL(source.url) }
         else { NSDocumentController.shared.noteNewRecentDocumentURL(projectURL!) }
     }

@@ -70,12 +70,17 @@ public enum Settings {
     /// Speed-ups offered in the Speed menu (a custom value can also be typed in).
     public static let speedPresets: [Double] = [2, 4, 8]
     public static let customSpeedRange = 1.1...32.0
-    /// Shortest video the trim handles allow, in seconds.
-    public static let minimumKeptSeconds = 0.2
-    /// Thumbnails generated across the recording for the timeline strip.
-    public static let timelineThumbnailCount = 40
-    /// Height of the timeline track, in points.
-    public static let timelineTrackHeight: Double = 56
+    /// Shortest clip a split can make, in seconds of finished video.
+    public static let minimumClipSeconds = 0.1
+    /// Height of each timeline track (clips on top, zooms below), in points.
+    public static let timelineTrackHeight: Double = 44
+    /// Gap drawn between clips on the timeline, in points.
+    public static let timelineClipGap: Double = 4
+    /// Timeline colours: clips, the blue edit line, the gray playhead, the (empty) zoom track.
+    public static let timelineClipColor = RGBAColor(hex: 0xE8900C)
+    public static let timelineEditLineColor = RGBAColor(hex: 0x1F8BFF)
+    public static let timelinePlayheadColor = RGBAColor(hex: 0x8E8E93)
+    public static let timelineZoomTrackColor = RGBAColor(hex: 0x241C38)
     /// Slider drags and handle drags closer together than this count as one undo step.
     public static let undoCoalesceSeconds = 0.6
     /// How many edits Undo remembers.

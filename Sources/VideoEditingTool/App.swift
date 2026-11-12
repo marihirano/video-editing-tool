@@ -14,7 +14,8 @@ struct VideoEditingToolApp: App {
                 .frame(minWidth: 720, minHeight: 480)
                 .preferredColorScheme(.dark)
         }
-        .defaultSize(width: 1100, height: 720)
+        .defaultSize(width: 1200, height: 780)
+        .windowToolbarStyle(.unified(showsTitle: false))
         .commands { AppMenus(model: model) }
     }
 }

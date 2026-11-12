@@ -1,186 +1,199 @@
+import AppKit
 import EditorCore
 import SwiftUI
 
-/// The timeline under the preview: thumbnails of the whole recording, with trimmed-off ends
-/// dimmed, cut parts striped, sped-up parts marked, a drag-to-select range and the playhead.
-/// Click to move the playhead; drag across to select; drag the yellow handles to trim.
+/// The bottom of the window: play / time / scissors, then two tracks.
+/// Top track: the clips (orange) that make up the video. Bottom track: zooms (empty until M4).
+/// The gray line is the playhead; the blue line follows the mouse (the preview shows that
+/// moment) and stays where you click. The scissors splits at the blue line; clicking a clip
+/// opens its menu (speed, delete).
 struct TimelineView: View {
     @EnvironmentObject private var model: EditorModel
     @EnvironmentObject private var playback: PlaybackController
-    /// Where a drag on the track began (source seconds), while selecting.
-    @State private var dragStart: Double?
+    @State private var dragging = false
+    @State private var customSpeed = "3"
 
-    private let height = Settings.timelineTrackHeight
-    private let handleWidth: CGFloat = 10
+    private let trackH = Settings.timelineTrackHeight
+    private let trackGap: CGFloat = 8
+    private let knob: CGFloat = 9
 
     var body: some View {
-        VStack(spacing: 8) {
-            TimelineToolbar()
+        VStack(alignment: .leading, spacing: 10) {
+            TransportBar()
             GeometryReader { geo in
-                let w = max(geo.size.width, 1)
-                let d = max(model.sourceDuration, 0.001)
-                let x = { (t: Double) in CGFloat(t / d) * w }
-                let t = { (x: CGFloat) in min(max(Double(x / w) * d, 0), d) }
-                let timeline = model.project?.timeline ?? Timeline()
-                let kept = timeline.keptRange(sourceDuration: d)
-
-                ZStack(alignment: .topLeading) {
-                    thumbnails
-                    // Trimmed-off ends.
-                    dim(from: 0, to: x(kept.start))
-                    dim(from: x(kept.end), to: w)
-                    // Cut parts.
-                    ForEach(Array(timeline.cuts.enumerated()), id: \.offset) { _, c in
-                        CutMark().frame(width: max(x(c.end) - x(c.start), 2), height: height).offset(x: x(c.start))
-                    }
-                    // Sped-up parts.
-                    ForEach(Array(timeline.speedSegments.enumerated()), id: \.offset) { _, s in
-                        SpeedMark(rate: s.rate).frame(width: max(x(s.range.end) - x(s.range.start), 2), height: height)
-                            .offset(x: x(s.range.start))
-                    }
-                    if let sel = model.selection {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.white.opacity(0.18))
-                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.white, lineWidth: 1.5))
-                            .frame(width: max(x(sel.end) - x(sel.start), 2), height: height)
-                            .offset(x: x(sel.start))
-                            .allowsHitTesting(false)
-                    }
-                    // Playhead.
-                    Rectangle().fill(Color.white).frame(width: 2, height: height + 10)
-                        .offset(x: x(playback.currentTime) - 1, y: -5)
-                        .shadow(radius: 2)
-                        .allowsHitTesting(false)
-                    // Trim handles.
-                    handle(edge: .leading).offset(x: x(kept.start) - handleWidth)
-                        .gesture(trimGesture(isStart: true, kept: kept, toTime: t))
-                    handle(edge: .trailing).offset(x: x(kept.end))
-                        .gesture(trimGesture(isStart: false, kept: kept, toTime: t))
-                }
-                .frame(width: w, height: height, alignment: .topLeading)
-                .contentShape(Rectangle())
-                .coordinateSpace(name: "track")
-                .gesture(trackGesture(toTime: t))
+                tracks(width: max(geo.size.width, 1))
             }
-            .frame(height: height)
-            .padding(.horizontal, handleWidth)
+            .frame(height: knob + trackH * 2 + trackGap)
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
-        .padding(.bottom, 12)
-        .background(.bar)
+        .padding(.bottom, 16)
+        .alert("Custom speed", isPresented: Binding(get: { model.customSpeedClip != nil }, set: { if !$0 { model.customSpeedClip = nil } })) {
+            TextField("Speed", text: $customSpeed)
+            Button("Apply") {
+                let r = Double(customSpeed.replacingOccurrences(of: "×", with: "").replacingOccurrences(of: ",", with: ".")) ?? 0
+                if let i = model.customSpeedClip, Settings.customSpeedRange.contains(r) { model.setSpeed(r, ofClip: i) }
+                model.customSpeedClip = nil
+            }
+            Button("Cancel", role: .cancel) { model.customSpeedClip = nil }
+        } message: {
+            Text("How many times faster, from \(Self.speedLabel(Settings.customSpeedRange.lowerBound)) to \(Self.speedLabel(Settings.customSpeedRange.upperBound)).")
+        }
     }
 
-    // MARK: Pieces
+    // MARK: Tracks
 
-    private var thumbnails: some View {
-        let aspect = model.project.map { Double($0.source.width) / Double(max($0.source.height, 1)) } ?? 16.0 / 9.0
-        let images = model.thumbnails
-        return Canvas { ctx, size in
-            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(white: 0.2)))
-            guard !images.isEmpty else { return }
-            let tileW = max(size.height * aspect, 8)
-            var x: CGFloat = 0
-            while x < size.width {
-                let i = min(images.count - 1, Int((x + tileW / 2) / size.width * CGFloat(images.count)))
-                if let img = images[i] {
-                    ctx.draw(Image(decorative: img, scale: 1), in: CGRect(x: x, y: 0, width: tileW, height: size.height))
-                }
-                x += tileW
+    private func tracks(width w: CGFloat) -> some View {
+        let map = model.timeMap
+        let total = max(map?.outputDuration ?? 1, 0.001)
+        let x = { (t: Double) in CGFloat(t / total) * w }
+        let t = { (x: CGFloat) in min(max(Double(x / w) * total, 0), total) }
+        let clips = model.clips
+        let starts = map?.pieces.map(\.outputStart) ?? []
+        let clipTop = knob
+        let zoomTop = knob + trackH + trackGap
+        let lineH = trackH * 2 + trackGap + 4
+
+        return ZStack(alignment: .topLeading) {
+            // Clips.
+            ForEach(Array(clips.enumerated()), id: \.offset) { i, c in
+                let gap = clips.count > 1 ? Settings.timelineClipGap / 2 : 0
+                let left = x(starts.indices.contains(i) ? starts[i] : 0) + (i > 0 ? gap : 0)
+                let right = x((starts.indices.contains(i) ? starts[i] : 0) + c.outputDuration) - (i < clips.count - 1 ? gap : 0)
+                ClipBar(clip: c, selected: model.selectedClip == i)
+                    .frame(width: max(right - left, 2), height: trackH)
+                    .offset(x: left, y: clipTop)
+            }
+            // Zoom track (filled in by M4).
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(rgba: Settings.timelineZoomTrackColor))
+                .overlay(Text("Zooms").font(.callout).foregroundStyle(.white.opacity(0.25)))
+                .frame(width: w, height: trackH)
+                .offset(y: zoomTop)
+            // Gray line: the playhead.
+            if let map {
+                line(color: Color(rgba: Settings.timelinePlayheadColor), height: lineH)
+                    .offset(x: x(map.outputTime(forSource: playback.playheadTime)) - knob / 2)
+            }
+            // Blue line: under the mouse, or where you last clicked.
+            if let b = model.blueLineTime {
+                line(color: Color(rgba: Settings.timelineEditLineColor), height: lineH)
+                    .offset(x: x(min(b, total)) - knob / 2)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 4))
-        .allowsHitTesting(false)
-    }
-
-    private func dim(from a: CGFloat, to b: CGFloat) -> some View {
-        Rectangle().fill(Color.black.opacity(0.72))
-            .frame(width: max(b - a, 0), height: height).offset(x: a)
-            .allowsHitTesting(false)
-    }
-
-    private func handle(edge: HorizontalEdge) -> some View {
-        UnevenRoundedRectangle(topLeadingRadius: edge == .leading ? 4 : 0, bottomLeadingRadius: edge == .leading ? 4 : 0,
-                               bottomTrailingRadius: edge == .trailing ? 4 : 0, topTrailingRadius: edge == .trailing ? 4 : 0)
-            .fill(Color.yellow)
-            .overlay(Capsule().fill(Color.black.opacity(0.5)).frame(width: 2, height: 18))
-            .frame(width: handleWidth, height: height)
-            .contentShape(Rectangle())
-            .onHover { inside in if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
-            .help(edge == .leading ? "Drag to trim the start" : "Drag to trim the end")
-    }
-
-    // MARK: Gestures
-
-    /// Click: move the playhead. Drag: select a part.
-    private func trackGesture(toTime t: @escaping (CGFloat) -> Double) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { g in
-                let moved = abs(g.translation.width) > 3
-                if !moved { return }
-                let a = dragStart ?? t(g.startLocation.x)
-                dragStart = a
-                let b = t(g.location.x)
-                model.selection = TimeRange(start: min(a, b), end: max(a, b))
+        .frame(width: w, height: knob + trackH * 2 + trackGap, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let p): model.hover(at: t(p.x))
+            case .ended: model.hover(at: nil)
             }
-            .onEnded { g in
-                if dragStart == nil {
-                    model.selection = nil
-                    playback.seek(to: t(g.location.x))
-                }
-                dragStart = nil
-            }
-    }
-
-    /// Drags a trim handle; the playhead follows so you can see the new first or last frame.
-    private func trimGesture(isStart: Bool, kept: TimeRange, toTime t: @escaping (CGFloat) -> Double) -> some Gesture {
-        DragGesture(minimumDistance: 1, coordinateSpace: .named("track"))
-            .onChanged { g in
-                let time = t(g.location.x)
-                if isStart {
-                    let s = min(time, kept.end - Settings.minimumKeptSeconds)
-                    model.setTrim(start: s, end: kept.end)
-                    playback.seek(to: s)
-                } else {
-                    let e = max(time, kept.start + Settings.minimumKeptSeconds)
-                    model.setTrim(start: kept.start, end: e)
-                    playback.seek(to: e)
-                }
-            }
-    }
-}
-
-/// A removed part: dark with red stripes.
-private struct CutMark: View {
-    var body: some View {
-        ZStack {
-            Rectangle().fill(Color.black.opacity(0.75))
-            Canvas { ctx, size in
-                var p = Path()
-                var x: CGFloat = -size.height
-                while x < size.width { p.move(to: CGPoint(x: x, y: size.height)); p.addLine(to: CGPoint(x: x + size.height, y: 0)); x += 8 }
-                ctx.stroke(p, with: .color(Color.red.opacity(0.55)), lineWidth: 1.5)
-            }
-            Image(systemName: "scissors").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
         }
-        .clipped()
-        .allowsHitTesting(false)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { g in
+                    if abs(g.translation.width) > 3 { dragging = true }
+                    if dragging { model.setEditPoint(t(g.location.x)) }
+                }
+                .onEnded { g in
+                    defer { dragging = false }
+                    guard !dragging else { return }
+                    let time = t(g.location.x)
+                    model.setEditPoint(time)
+                    let onClips = g.location.y >= clipTop && g.location.y <= clipTop + trackH
+                    if onClips, let map {
+                        let i = map.pieceIndex(atOutput: time)
+                        model.selectedClip = i
+                        DispatchQueue.main.async { ClipMenu.show(for: i, model: model) }
+                    } else {
+                        model.selectedClip = nil
+                    }
+                }
+        )
     }
-}
 
-/// A sped-up part: an orange band along the top with its speed.
-private struct SpeedMark: View {
-    let rate: Double
-    var body: some View {
+    /// A vertical line with a round knob on top, spanning both tracks.
+    private func line(color: Color, height: CGFloat) -> some View {
         VStack(spacing: 0) {
-            ZStack {
-                Rectangle().fill(Color.orange)
-                Text(TimelineToolbar.speedLabel(rate)).font(.system(size: 10, weight: .bold)).foregroundStyle(.black)
-            }
-            .frame(height: 14)
-            Rectangle().fill(Color.orange.opacity(0.18))
+            Circle().fill(color).frame(width: knob, height: knob)
+            Rectangle().fill(color).frame(width: 2, height: height)
         }
-        .clipped()
+        .frame(width: knob)
         .allowsHitTesting(false)
+    }
+
+    static func speedLabel(_ r: Double) -> String {
+        r == r.rounded() ? "\(Int(r))×" : String(format: "%.1f×", r)
+    }
+
+    /// "36s", or "6.4s" under ten seconds.
+    static func lengthLabel(_ seconds: Double) -> String {
+        if seconds >= 10 || abs(seconds - seconds.rounded()) < 0.05 { return "\(Int(seconds.rounded()))s" }
+        return String(format: "%.1fs", seconds)
+    }
+}
+
+/// One clip: an orange bar labelled with its length in the video and its speed.
+private struct ClipBar: View {
+    let clip: Clip
+    let selected: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(rgba: Settings.timelineClipColor))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.white, lineWidth: selected ? 2 : 0))
+                .overlay {
+                    if geo.size.width > 56 {
+                        Text("\(TimelineView.lengthLabel(clip.outputDuration)) \(TimelineView.speedLabel(clip.rate))")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                    }
+                }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// The menu that opens when a clip is clicked: speed choices, split, delete.
+@MainActor
+enum ClipMenu {
+    static func show(for i: Int, model: EditorModel) {
+        let clips = model.clips
+        guard clips.indices.contains(i) else { return }
+        let rate = clips[i].rate
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(.sectionHeader(title: "Speed"))
+        for r in [1.0] + Settings.speedPresets {
+            let item = ActionItem(r == 1 ? "Normal (1×)" : TimelineView.speedLabel(r)) { model.setSpeed(r, ofClip: i) }
+            item.state = abs(rate - r) < 0.001 ? .on : .off
+            menu.addItem(item)
+        }
+        let custom = ActionItem("Custom…") { model.customSpeedClip = i }
+        if !([1.0] + Settings.speedPresets).contains(where: { abs($0 - rate) < 0.001 }) {
+            custom.title = "Custom (\(TimelineView.speedLabel(rate)))…"
+            custom.state = .on
+        }
+        menu.addItem(custom)
+        menu.addItem(.separator())
+        menu.addItem(ActionItem("Split at Blue Line") { model.splitAtEditPoint() })
+        let delete = ActionItem("Delete Clip") { model.deleteClip(i) }
+        delete.isEnabled = clips.count > 1
+        menu.addItem(delete)
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    /// A menu item that runs a closure.
+    final class ActionItem: NSMenuItem {
+        private let handler: () -> Void
+        init(_ title: String, handler: @escaping () -> Void) {
+            self.handler = handler
+            super.init(title: title, action: #selector(run), keyEquivalent: "")
+            target = self
+        }
+        required init(coder: NSCoder) { fatalError() }
+        @objc private func run() { handler() }
     }
 }

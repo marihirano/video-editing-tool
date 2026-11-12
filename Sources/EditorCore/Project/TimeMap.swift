@@ -2,22 +2,22 @@ import Foundation
 
 /// Converts between output time (the finished video) and source time (the recording).
 ///
-/// Preview and export both ask this one place, so trims, cuts and speed-ups are handled
-/// the same way in both. All times are seconds from the start of the recording.
+/// Preview and export both ask this one place, so clips and speed changes are handled
+/// the same way in both. Source times are seconds from the start of the recording.
 public struct TimeMap: Sendable {
     public let sourceDuration: Double
-    public let timeline: Timeline
 
-    /// One stretch of the recording that ends up in the video, played at one speed.
+    /// One clip, placed on the finished video's clock.
     public struct Piece: Sendable, Equatable {
         public let source: TimeRange
         public let rate: Double
         /// Where this piece starts in the finished video.
         public let outputStart: Double
         public var outputDuration: Double { (source.end - source.start) / rate }
+        public var outputEnd: Double { outputStart + outputDuration }
     }
 
-    /// The kept stretches, in order. Never empty.
+    /// The clips, in order. Never empty.
     public let pieces: [Piece]
 
     public init(project: Project, sourceDuration: Double) {
@@ -26,48 +26,33 @@ public struct TimeMap: Sendable {
 
     public init(timeline: Timeline, sourceDuration: Double) {
         self.sourceDuration = sourceDuration
-        self.timeline = timeline
-        let kept = timeline.keptRange(sourceDuration: sourceDuration)
-        var marks: Set<Double> = [kept.start, kept.end]
-        for c in timeline.cuts { marks.insert(c.start); marks.insert(c.end) }
-        for s in timeline.speedSegments { marks.insert(s.range.start); marks.insert(s.range.end) }
-        let sorted = marks.filter { $0 >= kept.start && $0 <= kept.end }.sorted()
-
-        var built: [Piece] = []
         var out = 0.0
-        for (a, b) in zip(sorted, sorted.dropFirst()) where b - a > 0.0001 {
-            let mid = (a + b) / 2
-            if timeline.cuts.contains(where: { $0.start <= mid && mid < $0.end }) { continue }
-            let rate = max(0.01, timeline.speedSegments.first { $0.range.start <= mid && mid < $0.range.end }?.rate ?? 1)
-            // Join with the previous piece when it carries straight on at the same speed.
-            if let last = built.last, abs(last.source.end - a) < 0.0001, last.rate == rate {
-                built[built.count - 1] = Piece(source: TimeRange(start: last.source.start, end: b), rate: rate, outputStart: last.outputStart)
-            } else {
-                built.append(Piece(source: TimeRange(start: a, end: b), rate: rate, outputStart: out))
-            }
-            out += (b - a) / rate
+        pieces = timeline.resolvedClips(sourceDuration: sourceDuration).map { c in
+            defer { out += c.outputDuration }
+            return Piece(source: TimeRange(start: c.start, end: c.end), rate: c.rate, outputStart: out)
         }
-        if built.isEmpty { built = [Piece(source: TimeRange(start: kept.start, end: kept.start), rate: 1, outputStart: 0)] }
-        pieces = built
     }
 
     /// Length of the finished video, in seconds.
-    public var outputDuration: Double { pieces.last.map { $0.outputStart + $0.outputDuration } ?? 0 }
+    public var outputDuration: Double { pieces.last?.outputEnd ?? 0 }
 
     /// First and last source moments that appear in the video.
     public var firstSourceTime: Double { pieces.first!.source.start }
     public var lastSourceTime: Double { pieces.last!.source.end }
 
-    /// Source moment shown at a given output moment. Never goes backwards as output time
-    /// moves forwards, which lets export read the source in one pass.
-    public func sourceTime(forOutput t: Double) -> Double {
-        let t = max(0, t)
-        let piece = pieces.last { $0.outputStart <= t } ?? pieces[0]
-        return min(piece.source.end, piece.source.start + (t - piece.outputStart) * piece.rate)
+    /// Which clip is playing at an output moment.
+    public func pieceIndex(atOutput t: Double) -> Int {
+        pieces.lastIndex { $0.outputStart <= t } ?? 0
     }
 
-    /// Output moment for a source moment. A moment that was cut or trimmed away maps to
-    /// where the video carries on after it.
+    /// Source moment shown at a given output moment. Never goes backwards as output time
+    /// moves forwards (clips are kept in recording order), which lets export read the source in one pass.
+    public func sourceTime(forOutput t: Double) -> Double {
+        let piece = pieces[pieceIndex(atOutput: max(0, t))]
+        return min(piece.source.end, piece.source.start + (max(0, t) - piece.outputStart) * piece.rate)
+    }
+
+    /// Output moment for a source moment. A moment that was deleted maps to where the video carries on after it.
     public func outputTime(forSource s: Double) -> Double {
         for p in pieces {
             if s < p.source.start { return p.outputStart }

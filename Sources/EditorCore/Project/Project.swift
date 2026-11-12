@@ -71,34 +71,49 @@ public struct OutputSettings: Codable, Equatable, Sendable {
     public init() {}
 }
 
-/// Edits over time. All empty in M1; M3 and M4 fill them in.
+/// Edits over time.
 public struct Timeline: Codable, Equatable, Sendable {
-    /// Start and end of the kept part, in source seconds. `nil` = keep everything.
-    public var trim: TimeRange? = nil
-    public var cuts: [TimeRange] = []
-    public var speedSegments: [SpeedSegment] = []
+    /// The pieces of the recording that make up the video, in order, each with its own speed.
+    /// Empty = the whole recording at normal speed. Splitting makes two clips; deleting one
+    /// removes that part from the video.
+    public var clips: [Clip] = []
     public var zooms: [ZoomSegment] = []
     /// Room for sound later. v1 is silent.
     public var audioTracks: [AudioTrack] = []
+
+    /// Only read from files saved by the first M3 build, which stored a trim, cuts and
+    /// speed parts instead of clips. Turned into clips on the first edit; never written.
+    public var legacyTrim: TimeRange? = nil
+    public var legacyCuts: [TimeRange] = []
+    public var legacySpeedSegments: [SpeedSegment] = []
+
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case trim, cuts, speedSegments, zooms, audioTracks }
+    enum CodingKeys: String, CodingKey { case clips, zooms, audioTracks, trim, cuts, speedSegments }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        trim = try c.decodeIfPresent(TimeRange.self, forKey: .trim)
-        cuts = try c.decodeIfPresent([TimeRange].self, forKey: .cuts) ?? []
-        speedSegments = try c.decodeIfPresent([SpeedSegment].self, forKey: .speedSegments) ?? []
+        clips = try c.decodeIfPresent([Clip].self, forKey: .clips) ?? []
         zooms = try c.decodeIfPresent([ZoomSegment].self, forKey: .zooms) ?? []
         audioTracks = try c.decodeIfPresent([AudioTrack].self, forKey: .audioTracks) ?? []
+        legacyTrim = try c.decodeIfPresent(TimeRange.self, forKey: .trim)
+        legacyCuts = try c.decodeIfPresent([TimeRange].self, forKey: .cuts) ?? []
+        legacySpeedSegments = try c.decodeIfPresent([SpeedSegment].self, forKey: .speedSegments) ?? []
     }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(trim, forKey: .trim)
-        try c.encode(cuts, forKey: .cuts)
-        try c.encode(speedSegments, forKey: .speedSegments)
+        try c.encode(clips, forKey: .clips)
         try c.encode(zooms, forKey: .zooms)
         try c.encode(audioTracks, forKey: .audioTracks)
     }
+}
+
+/// One piece of the recording in the video: from `start` to `end` (source seconds) at `rate`.
+public struct Clip: Codable, Equatable, Sendable {
+    public var start: Double, end: Double
+    public var rate: Double
+    public init(start: Double, end: Double, rate: Double = 1) { self.start = start; self.end = end; self.rate = rate }
+    public var sourceDuration: Double { end - start }
+    public var outputDuration: Double { (end - start) / rate }
 }
 
 public struct TimeRange: Codable, Equatable, Sendable {

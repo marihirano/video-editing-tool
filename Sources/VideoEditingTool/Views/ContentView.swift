@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var model: EditorModel
     @State private var isDropTargeted = false
+    @AppStorage("showInspector") private var showInspector = true
 
     var body: some View {
         HStack(spacing: 0) {
@@ -13,19 +14,19 @@ struct ContentView: View {
                     EmptyStateView(isTargeted: isDropTargeted)
                 } else {
                     PreviewArea()
-                    TransportBar()
-                    Divider()
                     TimelineView()
                 }
             }
-            if model.project != nil {
+            if model.project != nil && showInspector {
                 Divider()
                 InspectorView()
+                    .transition(.move(edge: .trailing))
             }
         }
         .background(Color(rgba: Settings.previewSurround))
         .background(WindowCloseGuard())
         .navigationTitle(model.displayName)
+        .toolbar { toolbar }
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first else { return false }
             Task { await model.open(url) }
@@ -39,6 +40,33 @@ struct ContentView: View {
             Button("OK") { model.errorMessage = nil }
         } message: {
             Text(model.errorMessage ?? "")
+        }
+    }
+}
+
+extension ContentView {
+    /// Top bar: title in the middle; undo, redo, side-panel toggle and Export on the right.
+    @ToolbarContentBuilder var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Text(model.displayName).font(.headline)
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+                .help("Undo (⌘Z)").disabled(!model.canUndo)
+            Button { model.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
+                .help("Redo (⇧⌘Z)").disabled(!model.canRedo)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button { withAnimation(.easeInOut(duration: 0.2)) { showInspector.toggle() } } label: {
+                Label("Side Panel", systemImage: "sidebar.right")
+            }
+            .help(showInspector ? "Hide the style panel" : "Show the style panel")
+            .disabled(model.project == nil)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button("Export MP4") { model.startExport() }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.project == nil || model.export != nil)
         }
     }
 }

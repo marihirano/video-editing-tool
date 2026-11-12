@@ -3,14 +3,19 @@ import Combine
 
 /// Plays the source video silently and hands out decoded frames for the preview to draw.
 ///
-/// Follows the timeline's TimeMap while playing: starts at the trim, jumps over cuts,
-/// changes speed for sped-up parts and stops at the end of the trim, so the preview
+/// Follows the timeline's TimeMap while playing: starts at the first clip, jumps over deleted parts,
+/// changes speed for sped-up parts and stops after the last clip, so the preview
 /// plays what the export will contain.
 @MainActor
 public final class PlaybackController: ObservableObject {
     @Published public private(set) var isPlaying = false
-    /// Current position in the recording (source seconds).
+    /// Moment on screen right now (source seconds). While hovering the timeline this is the hovered moment.
     @Published public private(set) var currentTime: Double = 0
+    /// Where playback is or will resume from (source seconds): the gray line on the timeline.
+    /// Stays put while hovering shows other moments.
+    @Published public private(set) var playheadTime: Double = 0
+    /// True while the preview shows a hovered moment instead of the playhead.
+    @Published public private(set) var isSkimming = false
     /// Length of the recording (source seconds).
     @Published public private(set) var duration: Double = 0
 
@@ -33,6 +38,7 @@ public final class PlaybackController: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.currentTime = t.seconds
+                if !self.isSkimming { self.playheadTime = t.seconds }
                 if self.isPlaying { self.followTimeline() }
             }
         }
@@ -68,8 +74,23 @@ public final class PlaybackController: ObservableObject {
 
     public func togglePlay() { isPlaying ? pause() : play() }
 
+    /// Shows a moment in the preview without moving the playhead (hovering the timeline while paused).
+    public func skim(to seconds: Double) {
+        guard !isPlaying, player.currentItem != nil else { return }
+        isSkimming = true
+        currentTime = min(max(seconds, 0), duration)
+        player.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    /// Back to the playhead after hovering.
+    public func endSkim() {
+        guard isSkimming else { return }
+        seek(to: playheadTime)
+    }
+
     public func play() {
         guard player.currentItem != nil else { return }
+        if isSkimming { seek(to: playheadTime) }
         let map = timeMap
         // At the end (or past the trim): start over from the beginning of the video.
         if let map, map.piece(atSource: currentTime) == nil { seek(to: map.firstSourceTime) }
@@ -88,7 +109,9 @@ public final class PlaybackController: ObservableObject {
     /// so the timeline can show removed parts; playing from there skips ahead.
     public func seek(to seconds: Double) {
         let s = min(max(seconds, 0), max(duration, 0))
+        isSkimming = false
         currentTime = s
+        playheadTime = s
         player.seek(to: CMTime(seconds: s, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
@@ -116,6 +139,7 @@ public final class PlaybackController: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self, self.isPlaying else { return }
                 self.currentTime = self.player.currentTime().seconds
+                self.playheadTime = self.currentTime
                 self.followTimeline()
             }
         }

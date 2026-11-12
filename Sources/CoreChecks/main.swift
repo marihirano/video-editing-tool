@@ -28,7 +28,7 @@ do {
 
     let minimal = #"{"source":{"path":"/x.mov","width":10,"height":10,"duration":1}}"#
     let p = try JSONDecoder().decode(Project.self, from: Data(minimal.utf8))
-    check(p.output.fps == Settings.defaultOutputFPS && p.timeline.cuts.isEmpty, "older or partial files still open")
+    check(p.output.fps == Settings.defaultOutputFPS && p.timeline.clips.isEmpty, "older or partial files still open")
 }
 
 print("Style")
@@ -58,38 +58,38 @@ print("Timeline")
 do {
     func near(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 1e-6 }
     var tl = Timeline()
+    check(tl.resolvedClips(sourceDuration: 10) == [Clip(start: 0, end: 10)], "no edits: one clip, the whole recording")
     check(near(TimeMap(timeline: tl, sourceDuration: 10).outputDuration, 10), "no edits: video is as long as the recording")
-    tl.setTrim(start: 1, end: 9, sourceDuration: 10)       // keep 1–9  (8 s)
-    tl.addCut(TimeRange(start: 3, end: 4))                  // −1 s → 7 s
-    tl.setSpeed(TimeRange(start: 5, end: 7), rate: 4)       // 2 s → 0.5 s → 5.5 s
+    // Split at 1, 3, 4, 5, 7, 9 → clips 0–1 | 1–3 | 3–4 | 4–5 | 5–7 | 7–9 | 9–10
+    for at in [1.0, 3, 4, 5, 7, 9] { tl.split(atOutput: at, sourceDuration: 10) }
+    check(tl.clips.count == 7, "six splits make seven clips")
+    check(!tl.split(atOutput: 3.05, sourceDuration: 10), "a split right next to another is refused")
+    tl.deleteClip(6, sourceDuration: 10)       // drop 9–10
+    tl.deleteClip(2, sourceDuration: 10)       // drop 3–4
+    tl.deleteClip(0, sourceDuration: 10)       // drop 0–1 → 1–3 | 4–5 | 5–7 | 7–9  (7 s)
+    tl.setRate(4, ofClip: 2, sourceDuration: 10)  // 5–7 at 4× → 0.5 s → 5.5 s
     let map = TimeMap(timeline: tl, sourceDuration: 10)
-    check(near(map.outputDuration, 5.5), "trim + cut + 4× speed: 5.5 s long (\(map.outputDuration))")
-    check(near(map.sourceTime(forOutput: 0), 1), "video starts at the trim")
-    check(near(map.sourceTime(forOutput: 2), 3) || near(map.sourceTime(forOutput: 2.0001), 4.0001), "jumps over the cut")
-    check(near(map.sourceTime(forOutput: 2.5), 4.5), "carries on after the cut")
-    check(near(map.sourceTime(forOutput: 3.25), 6), "sped-up part runs 4× faster")
-    check(near(map.sourceTime(forOutput: 5.5), 9), "video ends at the trim")
-    check(near(map.outputTime(forSource: 3.5), 2), "a cut-away moment maps to where the video carries on")
-    check(near(map.outputTime(forSource: 6), 3.25), "output time from source time")
+    check(near(map.outputDuration, 5.5), "delete three clips + one at 4×: 5.5 s long (\(map.outputDuration))")
+    check(near(map.sourceTime(forOutput: 0), 1), "video starts at the first kept clip")
+    check(near(map.sourceTime(forOutput: 2.5), 4.5), "jumps over a deleted clip")
+    check(near(map.sourceTime(forOutput: 3.25), 6), "sped-up clip runs 4× faster")
+    check(near(map.sourceTime(forOutput: 5.5), 9), "video ends with the last clip")
+    check(near(map.outputTime(forSource: 3.5), 2), "a deleted moment maps to where the video carries on")
+    check(map.pieceIndex(atOutput: 3.0) == 2, "finds the clip under a timeline position")
     var last = -1.0, monotonic = true
     for i in 0...550 { let s = map.sourceTime(forOutput: Double(i) / 100); if s < last - 1e-9 { monotonic = false }; last = s }
     check(monotonic, "source time never goes backwards")
-
-    var t2 = tl
-    t2.addCut(TimeRange(start: 3.5, end: 4.5))
-    check(t2.cuts == [TimeRange(start: 3, end: 4.5)], "overlapping cuts merge")
-    t2.setSpeed(TimeRange(start: 6, end: 8), rate: 2)
-    check(t2.speedSegments.count == 2 && near(t2.speedSegments[0].range.end, 6) && t2.speedSegments[1].rate == 2,
-          "new speed replaces the overlapping part of an old one")
-    t2.clearEdits(in: TimeRange(start: 0, end: 10))
-    check(t2.cuts.isEmpty && t2.speedSegments.isEmpty, "restore clears cuts and speed")
-    t2.setTrim(start: 0, end: 10, sourceDuration: 10)
-    check(t2.trim == nil, "trimming to the whole recording means no trim")
+    var one = Timeline(); one.deleteClip(0, sourceDuration: 10)
+    check(one.resolvedClips(sourceDuration: 10).count == 1, "the last clip can't be deleted")
 
     var proj = Project(source: SourceVideo(path: "/x.mov", width: 10, height: 10, duration: 10))
     proj.timeline = tl
     let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(proj))
-    check(back.timeline == tl, "trim, cuts and speed survive save and reopen")
+    check(back.timeline == tl, "clips and speeds survive save and reopen")
+
+    let m3 = #"{"source":{"path":"/x.mov","width":10,"height":10,"duration":10},"timeline":{"trim":{"start":1,"end":9},"cuts":[{"start":3,"end":4}],"speedSegments":[{"range":{"start":5,"end":7},"rate":4}]}}"#
+    let old = try JSONDecoder().decode(Project.self, from: Data(m3.utf8))
+    check(near(TimeMap(project: old, sourceDuration: 10).outputDuration, 5.5), "first-M3 files (trim, cuts, speed) open as clips")
 
     var h = UndoHistory<Int>()
     let t0 = Date()
@@ -163,16 +163,17 @@ do {
     check(near(pixel(960, 540), (0, 194, 208)), "styled export: video fills the middle")
     check(near(pixel(100, 540), (255, 0, 255)), "styled export: padding strip is background")
 
-    // An edited export: keep 0.2–1.8 s, cut 0.6–1.0 s, play 1.0–1.4 s at 4× → 0.4 + 0.1 + 0.4 = 0.9 s.
+    // An edited export: split at 0.2, 0.6, 1.0, 1.4, 1.8; delete 0–0.2, 0.6–1.0, 1.8–2; 1.0–1.4 at 4×
+    // → 0.4 + 0.1 + 0.4 = 0.9 s.
     var edited = Project(source: info.sourceVideo)
-    edited.timeline.setTrim(start: 0.2, end: 1.8, sourceDuration: info.duration)
-    edited.timeline.addCut(TimeRange(start: 0.6, end: 1.0))
-    edited.timeline.setSpeed(TimeRange(start: 1.0, end: 1.4), rate: 4)
+    for at in [0.2, 0.6, 1.0, 1.4, 1.8] { edited.timeline.split(atOutput: at, sourceDuration: info.duration) }
+    for i in [5, 2, 0] { edited.timeline.deleteClip(i, sourceDuration: info.duration) }
+    edited.timeline.setRate(4, ofClip: 1, sourceDuration: info.duration)
     let expected = TimeMap(project: edited, sourceDuration: info.duration).outputDuration
     let out3 = tmp.appendingPathComponent("edited.mp4")
     try await Exporter().export(project: edited, sourceURL: source, to: out3) { _ in }
     let editedDuration = try await AVURLAsset(url: out3).load(.duration).seconds
-    check(abs(expected - 0.9) < 1e-6 && abs(editedDuration - 0.9) < 0.04, "trimmed, cut and sped-up export is 0.9 s (\(editedDuration))")
+    check(abs(expected - 0.9) < 1e-6 && abs(editedDuration - 0.9) < 0.04, "edited export (deleted clips, 4× clip) is 0.9 s (\(editedDuration))")
 
     // The test video changes colour every frame, so comparing the middle pixel with the unedited
     // export (same look) at the matching source moment shows each frame came from the right place.

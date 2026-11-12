@@ -24,6 +24,13 @@ struct AppMenus: Commands {
             Button("Redo") { model.redo() }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .disabled(!model.canRedo)
+            Divider()
+            Button("Split Clip at Blue Line") { model.splitAtEditPoint() }
+                .keyboardShortcut("b")
+                .disabled(model.project == nil)
+            Button("Delete Clip") { if let i = model.selectedClip { model.deleteClip(i) } }
+                .keyboardShortcut(.delete, modifiers: [])
+                .disabled(model.selectedClip == nil || model.clips.count < 2)
         }
         CommandGroup(replacing: .importExport) {
             Button("Export MP4…") { model.startExport() }

@@ -1,44 +1,36 @@
 import EditorCore
 import SwiftUI
 
-/// Play/pause, the position slider, the time, and the Export button.
+/// Play/pause, the time in the finished video, and the scissors (split at the blue line).
 struct TransportBar: View {
     @EnvironmentObject private var model: EditorModel
     @EnvironmentObject private var playback: PlaybackController
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             Button { playback.togglePlay() } label: {
-                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 15))
-                    .frame(width: 28, height: 22)
+                Image(systemName: playback.isPlaying ? "pause.circle" : "play.circle")
+                    .font(.system(size: 22, weight: .light))
             }
+            .buttonStyle(.plain)
             .keyboardShortcut(.space, modifiers: [])
             .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
 
-            // Time in the finished video (after trims, cuts and speed-ups).
-            Text("\(Self.format(playback.outputTime)) / \(Self.format(playback.outputDuration))")
-                .font(.system(.body, design: .monospaced))
-                .foregroundStyle(.secondary)
+            (Text(Self.format(playback.outputTime)).foregroundStyle(.primary)
+             + Text(" / \(Self.format(playback.outputDuration))").foregroundStyle(.secondary))
+                .font(.system(size: 15).monospacedDigit())
 
+            Button { model.splitAtEditPoint() } label: {
+                Image(systemName: "scissors").font(.system(size: 17))
+            }
+            .buttonStyle(.plain)
+            .help("Split the clip at the blue line (⌘B)")
             Spacer()
-
-            Button { model.undo() } label: { Image(systemName: "arrow.uturn.backward") }
-                .help("Undo (⌘Z)").disabled(!model.canUndo)
-            Button { model.redo() } label: { Image(systemName: "arrow.uturn.forward") }
-                .help("Redo (⇧⌘Z)").disabled(!model.canRedo)
-
-            Button("Export MP4…") { model.startExport() }
-                .disabled(model.export != nil)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(.bar)
     }
 
-    static func format(_ seconds: Double, precise: Bool = false) -> String {
+    static func format(_ seconds: Double) -> String {
         let s = Int(max(seconds, 0).rounded(.down))
-        if precise { return String(format: "%d:%02d.%d", s / 60, s % 60, Int((max(seconds, 0) * 10).rounded(.down)) % 10) }
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 }

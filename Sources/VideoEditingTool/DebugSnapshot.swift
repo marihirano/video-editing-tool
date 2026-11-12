@@ -9,12 +9,20 @@ enum DebugSnapshot {
         guard let path = ProcessInfo.processInfo.environment["VET_SNAPSHOT"] else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             let model = EditorModel.shared
+            // VET_SNAPSHOT_SPLIT=1 makes one split at a third of the way and pins the blue line there.
+            if ProcessInfo.processInfo.environment["VET_SNAPSHOT_SPLIT"] != nil, let map = model.timeMap {
+                model.setEditPoint(map.outputDuration / 3)
+                model.splitAtEditPoint()
+                model.selectedClip = 1
+            }
             model.playback.play()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                if let view = NSApp.windows.first(where: { $0.isVisible })?.contentView,
-                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                // The window content, plus the top bar on its own (`…-top.png`).
+                let content = NSApp.windows.first(where: { $0.isVisible })?.contentView
+                for (view, file) in [(content, path), (content?.superview, path + "-top.png")] {
+                    guard let view, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
                     view.cacheDisplay(in: view.bounds, to: rep)
-                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: file))
                 }
                 let line = "project=\(model.project != nil) playing=\(model.playback.isPlaying) time=\(model.playback.currentTime) videoFramesDrawn=\(model.drawer?.videoFramesDrawn ?? -1)\n"
                 try? line.write(toFile: path + ".txt", atomically: true, encoding: .utf8)

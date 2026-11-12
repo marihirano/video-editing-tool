@@ -19,6 +19,7 @@ This file is the shared memory for every Claude session on this project. Any age
 
 ## Current status
 
+- **Local folder:** `~/video-editing-tool` (the old name, on purpose, so past conversations stay visible in the Claude app). Everything else is named `video-editor`. Don't rename the folder.
 - **Phase:** M5 (export options and polish) built and pushed on 2026-11-12, **waiting for Mari to try it**; this finishes the MVP build. M4, M3 and M2 are also still waiting for feedback. M1 was approved on 2026-11-10. Next: feedback rounds, then phase 2 (install Xcode first).
 - Git repo on branch `main`, remote `origin` = https://github.com/marihirano/video-editor.git. Pushed to GitHub on 2026-11-10 (Mari approved). The `gh` tool isn't installed; use plain `git`.
 - **Build the app:** `scripts/build-app.sh` → `build/Video Editor.app` (release build, ad-hoc signed). **Run checks:** `swift run CoreChecks` (project save/reopen, shader compile, layout, a real 1080p hardware export of a generated test video). XCTest and Swift Testing don't run without Xcode, so checks are a plain program.
@@ -82,7 +83,7 @@ node ~/design-project-drive/sweep.mjs add --type <type> --url <url> --label "<sh
 
 Newest first. Each entry: date, decision, reason.
 
-- **2026-11-12** — **Renamed everything to `video-editor`** (it was `video-editing-tool`): the app ("Video Editor", bundle id `com.marihirano.video-editor`, Swift target `VideoEditor`), the local folder `~/video-editor`, the GitHub repo, Project Drive (the old name is kept as an alias, so old `#video-editing-tool` tags still match), the docs and the triage page. Project files keep the `.vetproj` extension, so saved projects still open. *Why:* Mari's call. Use `video-editor` for any new repo, Figma file or deployment, and `#video-editor` in reflections.
+- **2026-11-12** — **Renamed everything to `video-editor`** (it was `video-editing-tool`): the app ("Video Editor", bundle id `com.marihirano.video-editor`, Swift target `VideoEditor`), the GitHub repo, Project Drive (the old name is kept as an alias, so old `#video-editing-tool` tags still match), the docs and the triage page. Project files keep the `.vetproj` extension, so saved projects still open. **The local folder stays `~/video-editing-tool`:** it was moved to `~/video-editor` briefly, but the Claude app hides past conversations whose folder is gone, so Mari had it moved back. *Why:* Mari's call. Use `video-editor` for any new repo, Figma file or deployment, and `#video-editor` in reflections.
 
 - **2026-11-12** — **A zoom near the video's edge shows the padding and background (Mari).** The zoomed view is centred on the zoom's point and only stops at the edges of the whole picture (it no longer stays over the video). *Why:* matches Mari's reference video. A zoom pointing at the middle still shows only video.
 
@@ -121,6 +122,8 @@ Newest first. Each entry: date, decision, reason.
 ## Session log
 
 Newest first. One or two lines per session.
+
+- **2026-11-12** — Renamed the project to `video-editor`: app, bundle id, Swift target, GitHub repo, Project Drive (alias kept), docs and triage page. Moved the folder to `~/video-editor`, then back to `~/video-editing-tool` because the Claude app hid the past conversations.
 
 - **2026-11-12** — Fixed shaky edges while zooming in the preview: Mari's recording is 30 fps and the preview moved the zoom only when a new video frame arrived (uneven steps on a 60 Hz screen). The preview now times zooms by the playback clock. Export was already smooth (checked frame by frame on Mari's project). Added a debug export tool.
 

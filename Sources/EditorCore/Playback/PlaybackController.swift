@@ -30,6 +30,9 @@ public final class PlaybackController: ObservableObject {
     private var boundaryObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var lastFrame: (buffer: CVPixelBuffer, time: Double)?
+    /// The playback clock at the last `frameForDisplay` call (source seconds). While playing it moves
+    /// smoothly at the screen's refresh rate, even when the video has fewer frames (e.g. 30 fps).
+    public private(set) var displayClock: Double = 0
 
     public init() {
         player.isMuted = true                 // no sound in v1
@@ -150,6 +153,7 @@ public final class PlaybackController: ObservableObject {
     public func frameForDisplay() -> (buffer: CVPixelBuffer, time: Double)? {
         guard let output = videoOutput else { return nil }
         let itemTime = output.itemTime(forHostTime: CACurrentMediaTime())
+        displayClock = itemTime.seconds
         if output.hasNewPixelBuffer(forItemTime: itemTime),
            let buffer = output.copyPixelBuffer(forItemTime: itemTime, itemTimeForDisplay: nil) {
             lastFrame = (buffer, itemTime.seconds)

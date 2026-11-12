@@ -4,6 +4,7 @@ import EditorCore
 import Foundation
 
 // Plain-program checks for the core. Run: swift run CoreChecks
+if try await DebugDump.run() { exit(0) }
 var failures = 0
 func check(_ ok: Bool, _ what: String) {
     print(ok ? "  ok   \(what)" : "  FAIL \(what)")

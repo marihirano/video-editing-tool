@@ -37,7 +37,10 @@ public final class PreviewDrawer: NSObject, MTKViewDelegate {
         guard let drawable = view.currentDrawable, let cb = renderer.makeCommandBuffer() else { return }
         if let project, let frame = playback.frameForDisplay() {
             let size = CGSize(width: CVPixelBufferGetWidth(frame.buffer), height: CVPixelBufferGetHeight(frame.buffer))
-            let outputTime = playback.timeMap?.outputTime(forSource: frame.time) ?? frame.time
+            // Animations (zoom) follow the playback clock, not the frame's own time: a 30 fps recording
+            // would otherwise move the zoom in uneven steps on a 60 Hz screen. Export does the same (frame n / fps).
+            let clock = playback.isPlaying && playback.displayClock.isFinite ? playback.displayClock : frame.time
+            let outputTime = playback.timeMap?.outputTime(forSource: clock) ?? clock
             let m: LayoutMode = (mode == .withoutZoom && playback.isPlaying) ? .normal : mode
             let u = FrameLayout.uniforms(project: project, sourceSize: size, outputTime: outputTime,
                                          timeMap: playback.timeMap, mode: m)

@@ -185,7 +185,8 @@ do {
     check(abs(zu.shape.x - 2 * r0.shape.x) < 1e-4 && abs(zu.camera.z - 0.5) < 1e-6, "corners and shadow grow with the zoom; background zooms too")
     padded.timeline.zooms[0].centerX = 0; padded.timeline.zooms[0].centerY = 0
     let zc = FrameLayout.uniforms(project: padded, sourceSize: CGSize(width: 1440, height: 900), outputTime: 3)
-    check(abs(zc.contentRect.x) < 1e-5 && abs(zc.contentRect.y) < 1e-5, "zooming at a corner lines the video's corner up with the picture's (no background)")
+    check(abs(zc.camera.x) < 1e-6 && abs(zc.camera.y) < 1e-6 && zc.contentRect.x > 0.1 && zc.contentRect.y > 0.1,
+          "zooming at a corner shows the padding and background there")
 
     // Save and reopen.
     var proj = Project(source: SourceVideo(path: "/x.mov", width: 1440, height: 900, duration: 10))
@@ -333,7 +334,7 @@ do {
     // Example frames of a zoom with the default look, for eyeballing (only with VET_CHECK_FRAME_DIR).
     if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] {
         var look = Project(source: info.sourceVideo)
-        look.timeline.zooms = [ZoomSegment(range: TimeRange(start: 0, end: 2), centerX: 0.7, centerY: 0.3, scale: 1.5, transition: 0.8, bounce: 0)]
+        look.timeline.zooms = [ZoomSegment(range: TimeRange(start: 0, end: 2), centerX: 0.9, centerY: 0.1, scale: 1.5, transition: 0.8, bounce: 0)]
         let out6 = tmp.appendingPathComponent("look.mp4")
         try await Exporter().export(project: look, sourceURL: source, to: out6) { _ in }
         let g = AVAssetImageGenerator(asset: AVURLAsset(url: out6))

@@ -173,13 +173,12 @@ public struct ZoomCamera: Sendable {
     }
 
     /// What a zoom shows once fully in, on the whole canvas (fractions 0–1): `1/scale` of the canvas
-    /// around the zoom's point on the video (`content` = where the video sits). It stays over the
-    /// video where it fits, so a zoom fills the picture with video, not background.
+    /// centred on the zoom's point on the video (`content` = where the video sits). It only stops at
+    /// the canvas edges, so a point near the video's edge shows the padding and background there.
     public static func canvasTarget(_ zoom: ZoomSegment, content: CGRect) -> CGRect {
         let size = 1 / max(zoom.scale, 1)
         func axis(_ c: Double, _ lo: CGFloat, _ len: CGFloat) -> CGFloat {
-            guard size <= len else { return lo + len / 2 - size / 2 }   // wider than the video: centre on it
-            return min(max(lo + CGFloat(c) * len - size / 2, lo), lo + len - size)
+            min(max(lo + CGFloat(c) * len - size / 2, 0), 1 - size)
         }
         return CGRect(x: axis(zoom.centerX, content.minX, content.width), y: axis(zoom.centerY, content.minY, content.height),
                       width: size, height: size)

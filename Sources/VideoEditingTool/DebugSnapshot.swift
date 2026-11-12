@@ -13,6 +13,7 @@ enum DebugSnapshot {
             if ProcessInfo.processInfo.environment["VET_SNAPSHOT_SPLIT"] != nil, let map = model.timeMap {
                 model.startCutMode()                       // same path as the scissors button
                 model.cut(atOutput: map.outputDuration / 3)
+                model.endCutMode()
                 model.selectedClip = 1
             }
             model.playback.play()

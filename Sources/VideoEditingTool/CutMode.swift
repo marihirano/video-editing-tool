@@ -1,8 +1,8 @@
 import AppKit
 
 /// The scissors tool: after the scissors button is clicked, the pointer is a pair of scissors
-/// until the next click. A click on the timeline cuts there; a click anywhere else, Esc, or the
-/// scissors button again puts the tool away.
+/// and every click on the timeline cuts there. Clicking the scissors button again (or Esc)
+/// puts the tool away.
 @MainActor
 final class CutMode {
     private var monitor: Any?
@@ -38,9 +38,6 @@ final class CutMode {
             switch event.type {
             case .keyDown where event.keyCode == 53:   // Esc
                 self.onCancel(); return nil
-            case .leftMouseUp:
-                // The timeline handles its own click first; if the tool is still out after that, put it away.
-                DispatchQueue.main.async { if self.monitor != nil { self.onCancel() } }
             default:
                 DispatchQueue.main.async { if self.monitor != nil { Self.cursor.set() } }
             }

@@ -27,7 +27,7 @@ struct TransportBar: View {
                     .background(RoundedRectangle(cornerRadius: 6).fill(model.isCutMode ? Color.accentColor : .clear))
             }
             .buttonStyle(.plain)
-            .help(model.isCutMode ? "Click the timeline to cut there (Esc to stop)" : "Cut: click, then click the timeline where you want to cut")
+            .help(model.isCutMode ? "Click the timeline to cut; click the scissors again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut")
             Spacer()
         }
     }

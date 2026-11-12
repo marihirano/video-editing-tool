@@ -118,12 +118,12 @@ final class EditorModel: ObservableObject {
         cutMode.stop()
     }
 
-    /// A click on the timeline with the scissors tool: splits the clip there and puts the tool away.
+    /// A click on the timeline with the scissors tool: splits the clip there. The tool stays out
+    /// until the scissors button is clicked again.
     func cut(atOutput t: Double) {
         let d = sourceDuration
         edit { $0.timeline.split(atOutput: t, sourceDuration: d) }
         setEditPoint(t)
-        endCutMode()
     }
 
     /// ⌘B: splits the clip under the blue line (or the playhead if no line is set).

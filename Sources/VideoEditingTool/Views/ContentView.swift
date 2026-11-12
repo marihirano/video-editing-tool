@@ -20,7 +20,9 @@ struct ContentView: View {
             if model.project != nil && showInspector {
                 Divider()
                 Group {
-                    if let i = model.selectedClip, model.clips.indices.contains(i) { ClipInspector(index: i) }
+                    if model.isCropMode { CropInspector() }
+                    else if let i = model.selectedZoom, model.zooms.indices.contains(i) { ZoomInspector(index: i) }
+                    else if let i = model.selectedClip, model.clips.indices.contains(i) { ClipInspector(index: i) }
                     else { InspectorView() }
                 }
                 .transition(.move(edge: .trailing))
@@ -30,8 +32,10 @@ struct ContentView: View {
         .background(WindowCloseGuard())
         .navigationTitle(model.displayName)
         .toolbar { toolbar }
-        // Selecting a clip opens the side panel if it was hidden, to show the clip's speed.
-        .onChange(of: model.selectedClip) { if model.selectedClip != nil && !showInspector { withAnimation(.easeInOut(duration: 0.2)) { showInspector = true } } }
+        // Selecting a clip or zoom (or cropping) opens the side panel if it was hidden, to show its settings.
+        .onChange(of: model.selectedClip) { if model.selectedClip != nil { revealInspector() } }
+        .onChange(of: model.selectedZoom) { if model.selectedZoom != nil { revealInspector() } }
+        .onChange(of: model.isCropMode) { if model.isCropMode { revealInspector() } }
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first else { return false }
             Task { await model.open(url) }
@@ -50,6 +54,10 @@ struct ContentView: View {
 }
 
 extension ContentView {
+    private func revealInspector() {
+        if !showInspector { withAnimation(.easeInOut(duration: 0.2)) { showInspector = true } }
+    }
+
     /// Top bar: title in the middle; undo, redo, side-panel toggle and Export on the right.
     @ToolbarContentBuilder var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
@@ -85,6 +93,7 @@ struct PreviewArea: View {
         Group {
             if let drawer = model.drawer {
                 PreviewView(drawer: drawer)
+                    .overlay(PreviewOverlay())
                     .aspectRatio(CGFloat(output.width) / CGFloat(output.height), contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {

@@ -8,6 +8,9 @@ public final class PreviewDrawer: NSObject, MTKViewDelegate {
     private let playback: PlaybackController
     /// Read every frame, so edits show up immediately.
     public var project: Project?
+    /// What to leave out while editing on the preview (crop handles, aiming a zoom).
+    /// While playing, aiming a zoom shows the real zoom.
+    public var mode: LayoutMode = .normal
     /// How many preview frames showed real video (used by the debug snapshot).
     public private(set) var videoFramesDrawn = 0
 
@@ -34,7 +37,10 @@ public final class PreviewDrawer: NSObject, MTKViewDelegate {
         guard let drawable = view.currentDrawable, let cb = renderer.makeCommandBuffer() else { return }
         if let project, let frame = playback.frameForDisplay() {
             let size = CGSize(width: CVPixelBufferGetWidth(frame.buffer), height: CVPixelBufferGetHeight(frame.buffer))
-            let u = FrameLayout.uniforms(project: project, sourceSize: size, sourceTime: frame.time)
+            let outputTime = playback.timeMap?.outputTime(forSource: frame.time) ?? frame.time
+            let m: LayoutMode = (mode == .withoutZoom && playback.isPlaying) ? .normal : mode
+            let u = FrameLayout.uniforms(project: project, sourceSize: size, outputTime: outputTime,
+                                         timeMap: playback.timeMap, mode: m)
             renderer.encode(frame: frame.buffer, uniforms: u, backgroundImagePath: project.style.kind == .image ? project.style.imagePath : nil, into: drawable.texture, commandBuffer: cb)
             videoFramesDrawn += 1
         } else {

@@ -41,6 +41,7 @@ extension Timeline {
         guard list.count > 1, list.indices.contains(i) else { return }
         list.remove(at: i)
         setClips(list)
+        pruneHiddenZooms(sourceDuration: d)   // zooms only on the deleted part go with it
     }
 
     /// Plays a clip at `rate` (1 = normal speed).

@@ -1,6 +1,11 @@
 import CoreGraphics
 import simd
 
+extension Project {
+    /// The recording's size in pixels, as saved in the project.
+    public var sourceSize: CGSize { CGSize(width: source.width, height: source.height) }
+}
+
 /// Numbers the shader needs for one frame. Layout must match `FrameUniforms` in Shaders.swift.
 public struct FrameUniforms: Equatable {
     public var background: SIMD4<Float>    // plain colour
@@ -17,17 +22,34 @@ public struct FrameUniforms: Equatable {
     public var canvas: SIMD4<Float>        // canvas width and height in pixels
 }
 
+/// What the preview leaves out while something is being edited on it.
+public enum LayoutMode: Sendable {
+    /// The finished look (what export draws).
+    case normal
+    /// Crop applied, zoom left out: while aiming a zoom, the whole frame shows with a box on it.
+    case withoutZoom
+    /// The whole recording, no crop or zoom: while dragging the crop handles.
+    case wholeFrame
+}
+
 /// Works out what to draw for one frame, as a chain of steps in a fixed order:
 /// crop → zoom → cursor → frame and background.
-///
-/// Each step is its own small function. In M1 crop, zoom and cursor change nothing;
-/// later milestones fill them in without touching the renderer.
 public enum FrameLayout {
 
-    public static func uniforms(project: Project, sourceSize: CGSize, sourceTime: Double) -> FrameUniforms {
+    /// - Parameters:
+    ///   - outputTime: the moment in the finished video (seconds); zoom animations run on this clock.
+    ///   - timeMap: how clips map the recording onto the video; built from the project if nil.
+    public static func uniforms(project: Project, sourceSize: CGSize, outputTime: Double,
+                                timeMap: TimeMap? = nil, mode: LayoutMode = .normal) -> FrameUniforms {
         let full = CGRect(origin: .zero, size: sourceSize)
-        let cropped = cropStep(project.crop, full: full)
-        let visible = zoomStep(project.timeline.zooms, cropped: cropped, time: sourceTime)
+        let cropped = mode == .wholeFrame ? full : cropStep(project.crop, full: full, sourceSize: project.sourceSize)
+        let visible: CGRect
+        if mode == .normal, !project.timeline.zooms.isEmpty {
+            let map = timeMap ?? TimeMap(project: project, sourceDuration: project.source.duration)
+            visible = ZoomCamera(zooms: project.timeline.zooms, map: map).visibleRect(atOutput: outputTime, cropped: cropped)
+        } else {
+            visible = cropped
+        }
         // Cursor step (phase 2) draws on top in its own pass; it doesn't change the layout.
         let canvas = CGSize(width: project.output.width, height: project.output.height)
         let style = project.style
@@ -58,15 +80,22 @@ public enum FrameLayout {
         )
     }
 
-    /// Crop (M4): the part of the source to keep, in source pixels.
-    static func cropStep(_ crop: CropRect?, full: CGRect) -> CGRect {
-        guard let crop else { return full }
-        return CGRect(x: crop.x, y: crop.y, width: crop.width, height: crop.height).intersection(full)
+    /// Where the video sits on the canvas (fractions of the canvas), for drawing handles on the preview.
+    public static func contentRect(project: Project, mode: LayoutMode) -> CGRect {
+        let full = CGRect(origin: .zero, size: project.sourceSize)
+        let cropped = mode == .wholeFrame ? full : cropStep(project.crop, full: full, sourceSize: project.sourceSize)
+        return frameStep(contentAspect: cropped.width / max(cropped.height, 1),
+                         canvas: CGSize(width: project.output.width, height: project.output.height),
+                         paddingPercent: project.style.padding)
     }
 
-    /// Zoom (M4): the part of the cropped frame visible at this moment.
-    static func zoomStep(_ zooms: [ZoomSegment], cropped: CGRect, time: Double) -> CGRect {
-        cropped
+    /// Crop: the part of the source to keep, in pixels of the decoded frame. The crop is stored in
+    /// the recording's pixels (`stored`), so it's rescaled if the decoded frame is a different size.
+    static func cropStep(_ crop: CropRect?, full: CGRect, sourceSize stored: CGSize) -> CGRect {
+        guard let crop, stored.width > 0, stored.height > 0 else { return full }
+        let sx = full.width / stored.width, sy = full.height / stored.height
+        let r = CGRect(x: crop.x * sx, y: crop.y * sy, width: crop.width * sx, height: crop.height * sy).intersection(full)
+        return r.width >= 1 && r.height >= 1 ? r : full
     }
 
     /// Frame: where the video sits on the canvas, as fractions of the canvas. The padding

@@ -21,11 +21,17 @@ final class EditorModel: ObservableObject {
     @Published private var savedProject: Project?
     @Published private var history = UndoHistory<Project>()
     /// The blue line: where the mouse is over the timeline (finished-video seconds), or nil.
-    @Published private(set) var hoverTime: Double?
+    @Published private(set) var hoverTime: Double? { didSet { if (hoverTime == nil) != (oldValue == nil) { updatePreviewMode() } } }
     /// The blue line when not hovering: the last clicked spot (finished-video seconds). Split happens here.
     @Published private(set) var editTime: Double?
     /// The clip last clicked (highlighted), by its position on the timeline.
-    @Published var selectedClip: Int?
+    @Published var selectedClip: Int? { didSet { if selectedClip != nil { selectedZoom = nil; isCropMode = false } } }
+    /// The zoom last clicked; its settings show in the side panel and a box on the preview aims it.
+    @Published var selectedZoom: Int? {
+        didSet { if selectedZoom != nil { selectedClip = nil; isCropMode = false }; updatePreviewMode() }
+    }
+    /// True while the crop handles are on the preview.
+    @Published private(set) var isCropMode = false { didSet { updatePreviewMode() } }
     /// True while the scissors tool is out: the next click on the timeline cuts there.
     @Published private(set) var isCutMode = false
     private lazy var cutMode = CutMode { [weak self] in self?.endCutMode() }
@@ -110,6 +116,7 @@ final class EditorModel: ObservableObject {
 
     func startCutMode() {
         guard project != nil else { return }
+        isCropMode = false
         isCutMode = true
         cutMode.start()
     }
@@ -152,6 +159,85 @@ final class EditorModel: ObservableObject {
         edit { $0.timeline.setRate(rate, ofClip: i, sourceDuration: d) }
         // The video's clock changed; keep the blue line on the same recorded moment.
         if let src, let map = timeMap { editTime = map.outputTime(forSource: src) }
+    }
+
+    // MARK: Zooms (positions are finished-video seconds; stored as recording seconds)
+
+    var zooms: [ZoomSegment] { project?.timeline.zooms ?? [] }
+
+    /// Output-time position of each zoom on the zoom track.
+    var zoomRanges: [TimeRange] { timeMap.map { project?.timeline.zoomOutputRanges($0) ?? [] } ?? [] }
+
+    /// Dragging across empty space on the zoom track adds a zoom there and selects it.
+    func addZoom(from a: Double, to b: Double) {
+        guard let map = timeMap else { return }
+        var added: Int?
+        edit { added = $0.timeline.addZoom(fromOutput: a, to: b, map: map) }
+        if let added { selectedZoom = added }
+    }
+
+    /// Moving a zoom block (one drag = one undo step).
+    func moveZoom(_ i: Int, toStart t: Double) {
+        guard let map = timeMap else { return }
+        edit(group: "zoom-move") { _ = $0.timeline.moveZoom(i, toOutputStart: t, map: map) }
+    }
+
+    /// Dragging one end of a zoom block.
+    func resizeZoom(_ i: Int, startEdge: Bool, to t: Double) {
+        guard let map = timeMap else { return }
+        edit(group: "zoom-resize") { $0.timeline.resizeZoom(i, startEdge: startEdge, toOutput: t, map: map) }
+    }
+
+    /// Changes one zoom's amount, point or easing (slider drags = one undo step per control).
+    func updateZoom(_ i: Int, group: String, _ change: (inout ZoomSegment) -> Void) {
+        edit(group: "zoom-\(group)") { p in
+            guard p.timeline.zooms.indices.contains(i) else { return }
+            change(&p.timeline.zooms[i])
+        }
+    }
+
+    func deleteZoom(_ i: Int) {
+        edit { $0.timeline.deleteZoom(i) }
+        selectedZoom = nil
+    }
+
+    // MARK: Crop
+
+    /// Crop button: shows the crop handles on the preview (or puts them away).
+    func toggleCropMode() { isCropMode ? endCropMode() : startCropMode() }
+
+    func startCropMode() {
+        guard project != nil else { return }
+        endCutMode()
+        selectedClip = nil; selectedZoom = nil
+        isCropMode = true
+    }
+
+    func endCropMode() { isCropMode = false }
+
+    /// The crop as fractions of the recording (0–1), or the whole frame.
+    var cropFraction: CGRect {
+        guard let p = project, let c = p.crop, p.source.width > 0, p.source.height > 0 else { return CGRect(x: 0, y: 0, width: 1, height: 1) }
+        return CGRect(x: c.x / Double(p.source.width), y: c.y / Double(p.source.height),
+                      width: c.width / Double(p.source.width), height: c.height / Double(p.source.height))
+    }
+
+    /// Sets the crop from fractions of the recording. The whole frame means "no crop".
+    func setCrop(_ r: CGRect) {
+        edit(group: "crop") { p in
+            let w = Double(p.source.width), h = Double(p.source.height)
+            let x0 = (r.minX * w).rounded(), y0 = (r.minY * h).rounded()
+            let x1 = (r.maxX * w).rounded(), y1 = (r.maxY * h).rounded()
+            let c = CropRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
+            p.crop = (c.x <= 0 && c.y <= 0 && c.width >= w && c.height >= h) ? nil : c
+        }
+    }
+
+    func resetCrop() { edit { $0.crop = nil } }
+
+    /// Tells the preview what to leave out while editing on it.
+    private func updatePreviewMode() {
+        drawer?.mode = isCropMode ? .wholeFrame : (selectedZoom != nil && hoverTime == nil ? .withoutZoom : .normal)
     }
 
     /// Name shown in the window title.
@@ -197,7 +283,7 @@ final class EditorModel: ObservableObject {
         self.project = project
         savedProject = project
         history.reset()
-        hoverTime = nil; editTime = nil; selectedClip = nil
+        hoverTime = nil; editTime = nil; selectedClip = nil; selectedZoom = nil; isCropMode = false
         self.sourceURL = source.url
         self.projectURL = projectURL
         playback.load(source)

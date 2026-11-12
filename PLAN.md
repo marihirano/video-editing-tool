@@ -71,4 +71,4 @@ Before starting: install Xcode (free, from the App Store).
 
 ## Next step
 
-M2 and M3 are built; Mari is trying them. Then M4.
+M2, M3 and M4 are built; Mari is trying them. Then M5.

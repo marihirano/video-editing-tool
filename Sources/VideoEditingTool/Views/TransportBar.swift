@@ -1,7 +1,7 @@
 import EditorCore
 import SwiftUI
 
-/// Play/pause, the time in the finished video, and the scissors (split at the blue line).
+/// Play/pause, the time in the finished video, the scissors (cut tool) and crop.
 struct TransportBar: View {
     @EnvironmentObject private var model: EditorModel
     @EnvironmentObject private var playback: PlaybackController
@@ -28,6 +28,14 @@ struct TransportBar: View {
             }
             .buttonStyle(.plain)
             .help(model.isCutMode ? "Click the timeline to cut; click the scissors again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut")
+            Button { model.toggleCropMode() } label: {
+                Image(systemName: "crop").font(.system(size: 16))
+                    .foregroundStyle(model.isCropMode ? Color.white : Color.primary)
+                    .frame(width: 30, height: 26)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(model.isCropMode ? Color.accentColor : .clear))
+            }
+            .buttonStyle(.plain)
+            .help(model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording")
             Spacer()
         }
     }

@@ -50,7 +50,7 @@ do {
 
     var padded = Project(source: SourceVideo(path: "", width: 1440, height: 900, duration: 1))
     padded.style.padding = 10
-    let pu = FrameLayout.uniforms(project: padded, sourceSize: CGSize(width: 1440, height: 900), sourceTime: 0)
+    let pu = FrameLayout.uniforms(project: padded, sourceSize: CGSize(width: 1440, height: 900), outputTime: 0)
     check(abs(pu.contentRect.y - 0.1) < 1e-5 && abs(pu.contentRect.w - 0.8) < 1e-5, "10% padding leaves 10% free above and below")
 }
 
@@ -99,12 +99,84 @@ do {
     check(h.redo(current: 0) == 3 && h.redo(current: 3) == 4 && !h.canRedo, "redo brings edits back")
 }
 
+print("Zoom and crop")
+do {
+    func near(_ a: Double, _ b: Double, _ tol: Double = 1e-6) -> Bool { abs(a - b) < tol }
+    // Easing curve shape.
+    check(Spring.value(0, bounce: 0) == 0 && near(Spring.value(1, bounce: 0), 1), "easing starts at 0 and ends at 1")
+    check(Spring.value(0.03, bounce: 0) < 0.03, "easing starts at rest (slow first moment)")
+    check(Spring.value(0.5, bounce: 0) > 0.75, "easing is mostly there by halfway (spring feel)")
+    var mono = true, prev = -1.0
+    for i in 0...200 { let v = Spring.value(Double(i) / 200, bounce: 0); if v < prev - 1e-12 || v > 1 + 1e-9 { mono = false }; prev = v }
+    check(mono, "no bounce: never goes backwards or past 1")
+    let peak = (0...200).map { Spring.value(Double($0) / 200, bounce: 1) }.max()!
+    check(peak > 1.05 && peak < 1.25 && near(Spring.value(1, bounce: 1), 1), "full bounce overshoots a little, then lands on 1 (peak \(String(format: "%.3f", peak)))")
+
+    // Placement: zoom at 6–8 s of a 10 s recording.
+    var tl = Timeline()
+    tl.zooms = [ZoomSegment(range: TimeRange(start: 6, end: 8), centerX: 0.25, centerY: 0.75, scale: 2)]
+    for at in [2.0, 4.0, 9.0] { tl.split(atOutput: at, sourceDuration: 10) }   // 0–2 | 2–4 | 4–9 | 9–10
+    tl.deleteClip(1, sourceDuration: 10)                                         // drop 2–4
+    var map = TimeMap(timeline: tl, sourceDuration: 10)
+    var r = tl.zoomOutputRanges(map)[0]
+    check(near(r.start, 4) && near(r.end, 6), "deleting an earlier clip moves the zoom with its content (\(r.start)–\(r.end))")
+    tl.setRate(2, ofClip: 1, sourceDuration: 10)                                 // 4–9 at 2×
+    map = TimeMap(timeline: tl, sourceDuration: 10)
+    r = tl.zoomOutputRanges(map)[0]
+    check(near(r.start, 3) && near(r.end, 4), "speeding up its clip shortens the zoom in the video (\(r.start)–\(r.end))")
+    tl.zooms.append(ZoomSegment(range: TimeRange(start: 0.5, end: 1.5)))
+    tl.deleteClip(0, sourceDuration: 10)                                         // drop 0–2 with its zoom
+    check(tl.zooms.count == 1 && tl.zooms[0].scale == 2, "a zoom on a deleted clip goes with it")
+
+    // Add / move / resize on the finished video's clock, never overlapping.
+    var t2 = Timeline()
+    let m2 = TimeMap(timeline: t2, sourceDuration: 10)
+    let a = t2.addZoom(fromOutput: 2, to: 4, map: m2)
+    let b = t2.addZoom(fromOutput: 7, to: 5, map: m2)
+    check(a == 0 && b == 1 && t2.zooms.count == 2, "drag adds zooms (either direction)")
+    check(t2.addZoom(fromOutput: 3, to: 3.5, map: m2) == nil, "can't add a zoom on top of another")
+    t2.addZoom(fromOutput: 4.1, to: 9, map: m2)
+    check(t2.zooms.count == 3 && near(t2.zooms[1].range.end, 5), "a new zoom stops at the next zoom")
+    t2.deleteZoom(1)
+    t2.moveZoom(0, toOutputStart: 6, map: m2)
+    check(near(t2.zooms[0].range.start, 3) && near(t2.zooms[0].range.end, 5), "moving stops at the neighbour and keeps the length")
+    t2.resizeZoom(0, startEdge: true, toOutput: 4.95, map: m2)
+    check(near(t2.zooms[0].range.start, 5 - Settings.minimumZoomSeconds), "resizing keeps the minimum length")
+    t2.resizeZoom(0, startEdge: true, toOutput: -3, map: m2)
+    check(near(t2.zooms[0].range.start, 0), "resizing stops at the start of the video")
+
+    // Camera.
+    let cam = ZoomCamera(zooms: [ZoomSegment(range: TimeRange(start: 1, end: 5), centerX: 0.5, centerY: 0.5, scale: 2, transition: 1, bounce: 0)],
+                         map: TimeMap(timeline: Timeline(), sourceDuration: 10))
+    let frame = CGRect(x: 0, y: 0, width: 1000, height: 500)
+    check(cam.visibleRect(atOutput: 0.5, cropped: frame) == frame, "before a zoom: whole frame")
+    let mid = cam.visibleRect(atOutput: 3, cropped: frame)
+    check(near(mid.width, 500, 1e-6) && near(mid.midX, 500, 1e-6) && near(mid.midY, 250, 1e-6), "fully zoomed: half the frame around the point")
+    check(cam.visibleRect(atOutput: 1.5, cropped: frame).width < 1000 && cam.visibleRect(atOutput: 1.5, cropped: frame).width > 500, "halfway in: partly zoomed")
+    let edge = ZoomCamera.targetRect(ZoomSegment(range: TimeRange(start: 0, end: 1), centerX: 1, centerY: 0, scale: 2), cropped: frame)
+    check(edge == CGRect(x: 500, y: 0, width: 500, height: 250), "zooming at a corner stays inside the frame")
+
+    // Save and reopen.
+    var proj = Project(source: SourceVideo(path: "/x.mov", width: 1440, height: 900, duration: 10))
+    proj.timeline.zooms = [ZoomSegment(range: TimeRange(start: 1, end: 3), centerX: 0.2, centerY: 0.8, scale: 2.5, transition: 0.7, bounce: 0.3)]
+    proj.crop = CropRect(x: 100, y: 50, width: 800, height: 500)
+    let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(proj))
+    check(back.timeline.zooms == proj.timeline.zooms && back.crop == proj.crop, "zooms and crop survive save and reopen")
+    let partial = #"{"source":{"path":"/x.mov","width":10,"height":10,"duration":1},"timeline":{"zooms":[{"range":{"start":0,"end":1},"centerX":0.5,"centerY":0.5,"scale":2}]}}"#
+    let pz = try JSONDecoder().decode(Project.self, from: Data(partial.utf8)).timeline.zooms[0]
+    check(pz.scale == 2 && pz.transition == Settings.zoomEasingPresets[Settings.defaultZoomEasing].transition, "zooms without easing fields open with the default easing")
+    let cu = FrameLayout.uniforms(project: proj, sourceSize: CGSize(width: 1440, height: 900), outputTime: 0)
+    check(abs(cu.sourceRect.x - Float(100.0 / 1440)) < 1e-5 && abs(cu.sourceRect.z - Float(800.0 / 1440)) < 1e-5, "crop picks the right part of the frame")
+    let cw = FrameLayout.uniforms(project: proj, sourceSize: CGSize(width: 1440, height: 900), outputTime: 0, mode: .wholeFrame)
+    check(cw.sourceRect == SIMD4<Float>(0, 0, 1, 1), "crop editing shows the whole recording")
+}
+
 print("Renderer")
 check(MetalContext.shared != nil, "Metal shaders compile at startup")
 var plain = Project(source: SourceVideo(path: "", width: 1440, height: 900, duration: 1))
 plain.style.padding = 0
 let u = FrameLayout.uniforms(project: plain,
-                             sourceSize: CGSize(width: 1440, height: 900), sourceTime: 0)
+                             sourceSize: CGSize(width: 1440, height: 900), outputTime: 0)
 check(abs(u.contentRect.z - Float(1.6 / (16.0 / 9.0))) < 1e-5 && u.contentRect.w == 1, "16:10 video fits a 16:9 canvas, centred")
 
 print("Export")
@@ -190,6 +262,45 @@ do {
         if abs(got - want) > 6 { rightFrames = false }
     }
     check(rightFrames, "edited export shows the right moments (red got/expected:\(report))")
+    // Crop + zoom export: crop to the top-left 384×240 (same shape as the recording), then a 2×
+    // zoom on its centre for the whole video. Green = source row, blue steps 1 per source column.
+    var zoomed = Project(source: info.sourceVideo)
+    zoomed.style.padding = 0; zoomed.style.cornerRadius = 0; zoomed.style.shadowOpacity = 0
+    zoomed.crop = CropRect(x: 0, y: 0, width: 384, height: 240)
+    let out4 = tmp.appendingPathComponent("crop.mp4"), out5 = tmp.appendingPathComponent("zoom.mp4")
+    try await Exporter().export(project: zoomed, sourceURL: source, to: out4) { _ in }
+    zoomed.timeline.zooms = [ZoomSegment(range: TimeRange(start: 0, end: 2), centerX: 0.5, centerY: 0.5, scale: 2, transition: 0.3, bounce: 0)]
+    try await Exporter().export(project: zoomed, sourceURL: source, to: out5) { _ in }
+    func rgb(_ url: URL, _ t: Double, _ points: [(Int, Int)]) async throws -> [(Double, Double, Double)] {
+        let g = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        g.requestedTimeToleranceBefore = .zero; g.requestedTimeToleranceAfter = .zero
+        let (img, _) = try await g.image(at: CMTime(seconds: t, preferredTimescale: 600))
+        let rep = NSBitmapImageRep(cgImage: img)
+        if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] {
+            try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: dir).appendingPathComponent(url.deletingPathExtension().lastPathComponent + "-frame.png"))
+        }
+        return points.map { let c = rep.colorAt(x: $0.0, y: $0.1)!.usingColorSpace(.sRGB)!; return (c.redComponent * 255, c.greenComponent * 255, c.blueComponent * 255) }
+    }
+    // Content is 1728×1080 at x 96 in all three exports. Each output spot should show the same
+    // colour as the unedited export at the source spot it comes from.
+    func matches(_ url: URL, at t: Double, _ pairs: [((Int, Int), (Double, Double))]) async throws -> (Bool, String) {
+        let got = try await rgb(url, t, pairs.map(\.0))
+        let r = FrameLayout.contentRect(project: Project(source: info.sourceVideo), mode: .normal)   // unedited has default padding
+        let want = try await rgb(out, t, pairs.map { (Int((r.minX + $0.1.0 / 1440 * r.width) * 1920), Int((r.minY + $0.1.1 / 900 * r.height) * 1080)) })
+        var ok = true, report = ""
+        for (g, w) in zip(got, want) {
+            let d = abs(g.0 - w.0) + abs(g.1 - w.1) + abs(g.2 - w.2)
+            report += String(format: " %.0f", d)
+            if d > 30 { ok = false }
+        }
+        return (ok, report)
+    }
+    let (cropOK, cropR) = try await matches(out4, at: 1, [((960, 540), (192, 120)), ((960, 900), (192, 200)), ((528, 540), (96, 120)), ((1392, 540), (288, 120))])
+    check(cropOK, "crop export shows the cropped part (colour differences:\(cropR))")
+    let (zoomOK, zoomR) = try await matches(out5, at: 1, [((960, 540), (192, 120)), ((960, 900), (192, 160)), ((528, 540), (144, 120)), ((1392, 540), (240, 120))])
+    check(zoomOK, "zoom export shows 2× around the point (colour differences:\(zoomR))")
+    let (startOK, startR) = try await matches(out5, at: 0, [((960, 900), (192, 200)), ((528, 540), (96, 120))])
+    check(startOK, "zoom export starts un-zoomed (colour differences:\(startR))")
 }
 
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")

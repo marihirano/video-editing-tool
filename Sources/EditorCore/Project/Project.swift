@@ -127,19 +127,51 @@ public struct SpeedSegment: Codable, Equatable, Sendable {
     public init(range: TimeRange, rate: Double) { self.range = range; self.rate = rate }
 }
 
+/// One zoom on the zoom track. `range` is in **source** seconds (moments of the recording), so a
+/// zoom stays on the same content when clips before it are deleted or sped up. Its animation
+/// (`transition`) is in seconds of the finished video, so it feels the same at any clip speed.
 public struct ZoomSegment: Codable, Equatable, Sendable {
     public var range: TimeRange
-    /// Point to zoom towards, 0–1 across the (cropped) frame.
+    /// Point to zoom towards, 0–1 across the (cropped) frame, from the top-left.
     public var centerX: Double, centerY: Double
+    /// How far it zooms: 1.5 = 150%.
     public var scale: Double
+    /// Length of the zoom-in and of the zoom-out, in seconds of the finished video.
+    public var transition: Double
+    /// 0 = settles smoothly, 1 = the most overshoot ("bounce") allowed.
+    public var bounce: Double
+
+    public init(range: TimeRange, centerX: Double = 0.5, centerY: Double = 0.5,
+                scale: Double = Settings.defaultZoomScale,
+                transition: Double = Settings.zoomEasingPresets[Settings.defaultZoomEasing].transition,
+                bounce: Double = Settings.zoomEasingPresets[Settings.defaultZoomEasing].bounce) {
+        self.range = range; self.centerX = centerX; self.centerY = centerY
+        self.scale = scale; self.transition = transition; self.bounce = bounce
+    }
+
+    enum CodingKeys: String, CodingKey { case range, centerX, centerY, scale, transition, bounce }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = ZoomSegment(range: try c.decode(TimeRange.self, forKey: .range))
+        range = d.range
+        centerX = try c.decodeIfPresent(Double.self, forKey: .centerX) ?? d.centerX
+        centerY = try c.decodeIfPresent(Double.self, forKey: .centerY) ?? d.centerY
+        scale = try c.decodeIfPresent(Double.self, forKey: .scale) ?? d.scale
+        transition = try c.decodeIfPresent(Double.self, forKey: .transition) ?? d.transition
+        bounce = try c.decodeIfPresent(Double.self, forKey: .bounce) ?? d.bounce
+    }
 }
 
 public struct AudioTrack: Codable, Equatable, Sendable {
     public var name: String
 }
 
+/// Part of the recording to keep, in source pixels from the top-left.
 public struct CropRect: Codable, Equatable, Sendable {
     public var x: Double, y: Double, width: Double, height: Double
+    public init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x; self.y = y; self.width = width; self.height = height
+    }
 }
 
 public enum BackgroundKind: String, Codable, CaseIterable, Sendable {

@@ -81,6 +81,36 @@ public enum Settings {
     public static let timelineEditLineColor = RGBAColor(hex: 0x1F8BFF)
     public static let timelinePlayheadColor = RGBAColor(hex: 0x8E8E93)
     public static let timelineZoomTrackColor = RGBAColor(hex: 0x241C38)
+    /// Zoom blocks on the zoom track.
+    public static let timelineZoomColor = RGBAColor(hex: 0x7B5CF0)
+    /// Width of the grab area at each end of a zoom block for resizing, in points.
+    public static let timelineZoomEdgeGrab: Double = 7
+
+    // MARK: Zoom
+    /// How far a new zoom goes (1.5 = 150%), and the range of the Amount slider.
+    public static let defaultZoomScale = 1.5
+    public static let zoomScaleRange = 1.1...4.0
+    /// Shortest zoom, in seconds of finished video.
+    public static let minimumZoomSeconds = 0.3
+    /// Easing presets: transition = seconds for the zoom-in (and again for the zoom-out),
+    /// bounce = 0 (settles smoothly) to 1 (most overshoot).
+    public static let zoomEasingPresets: [EasingPreset] = [
+        .init(name: "Smooth", transition: 1.0, bounce: 0),
+        .init(name: "Quick", transition: 0.6, bounce: 0),
+        .init(name: "Gentle", transition: 1.6, bounce: 0),
+        .init(name: "Bouncy", transition: 0.9, bounce: 0.5),
+    ]
+    public static let defaultZoomEasing = 0
+    public static let zoomTransitionRange = 0.2...3.0
+    /// The spring behind the easing. Damping at full bounce (1 = no overshoot; 0.5 ≈ 16% overshoot),
+    /// and how settled the spring is when the transition ends (higher = faster start, longer tail).
+    public static let springMinDamping = 0.5
+    public static let springSettle = 6.0
+
+    // MARK: Crop
+    /// Smallest crop, as a fraction of the recording's width and height.
+    public static let minimumCropFraction = 0.1
+
     /// Slider drags and handle drags closer together than this count as one undo step.
     public static let undoCoalesceSeconds = 0.6
     /// How many edits Undo remembers.
@@ -100,6 +130,12 @@ public struct GradientPreset: Sendable {
     public let name: String
     public let start: RGBAColor, end: RGBAColor
     public let angle: Double
+}
+
+public struct EasingPreset: Sendable {
+    public let name: String
+    public let transition: Double
+    public let bounce: Double
 }
 
 public struct WallpaperPreset: Sendable {

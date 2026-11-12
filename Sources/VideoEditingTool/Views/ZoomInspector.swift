@@ -6,6 +6,7 @@ import SwiftUI
 struct ZoomInspector: View {
     @EnvironmentObject private var model: EditorModel
     let index: Int
+    @State private var still: CGImage?
 
     private var zoom: ZoomSegment {
         model.zooms.indices.contains(index) ? model.zooms[index] : ZoomSegment(range: TimeRange(start: 0, end: 0))
@@ -44,10 +45,12 @@ struct ZoomInspector: View {
                         Button("Centre") { model.updateZoom(index, group: "point") { $0.centerX = 0.5; $0.centerY = 0.5 } }
                             .controlSize(.small)
                     }
-                    FocusPicker(zoom: zoom, aspect: cropAspect) { x, y in
+                    FocusPicker(zoom: zoom, aspect: cropAspect, image: still) {
+                        model.showZoomInPreview(index)
+                    } set: { x, y in
                         model.updateZoom(index, group: "point") { $0.centerX = x; $0.centerY = y }
                     }
-                    Text("Drag the box here or on the preview.").font(.caption).foregroundStyle(.secondary)
+                    Text("Drag the circle to the spot to zoom in on.").font(.caption).foregroundStyle(.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -76,6 +79,17 @@ struct ZoomInspector: View {
         }
         .frame(width: 300)
         .background(.bar)
+        // A still of the recording at the middle of the zoom, cropped like the video.
+        .task(id: stillKey) {
+            guard let url = model.sourceURL, let t = model.zoomStillTime(index) else { still = nil; return }
+            still = await FrameStill.image(url: url, time: t, crop: model.cropFraction)
+        }
+    }
+
+    /// Changes when the picture needs to be grabbed again (another moment or another crop).
+    private var stillKey: String {
+        let t = model.zoomStillTime(index) ?? -1
+        return "\(index)-\((t * 10).rounded())-\(model.cropFraction.debugDescription)"
     }
 
     /// Width ÷ height of the (cropped) recording, so the picker has the same shape.
@@ -115,41 +129,46 @@ struct ZoomInspector: View {
     }
 }
 
-/// A small frame-shaped box with the zoom's area drawn on it; drag to move the area.
+/// A still of the (cropped) recording with a circle on the spot the zoom points at; drag the circle to move it.
 private struct FocusPicker: View {
     let zoom: ZoomSegment
     let aspect: CGFloat
+    let image: CGImage?
+    /// Called when a drag starts (shows the zoom in the preview).
+    let began: () -> Void
     let set: (Double, Double) -> Void
+    @State private var dragging = false
 
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
-            let r = ZoomCamera.targetRect(zoom, cropped: CGRect(x: 0, y: 0, width: 1, height: 1))
+            let d: CGFloat = 22
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.06))
-                RoundedRectangle(cornerRadius: 3)
+                if let image {
+                    Image(decorative: image, scale: 1).resizable().frame(width: size.width, height: size.height)
+                } else {
+                    Rectangle().fill(Color.white.opacity(0.06))
+                }
+                Circle()
                     .fill(Color(rgba: Settings.timelineZoomColor).opacity(0.35))
-                    .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Color(rgba: Settings.timelineZoomColor), lineWidth: 2))
-                    .frame(width: r.width * size.width, height: r.height * size.height)
-                    .offset(x: r.minX * size.width, y: r.minY * size.height)
+                    .overlay(Circle().strokeBorder(Color.white, lineWidth: 2.5))
+                    .overlay(Circle().fill(Color.white).frame(width: 4, height: 4))
+                    .shadow(color: .black.opacity(0.5), radius: 3)
+                    .frame(width: d, height: d)
+                    .offset(x: zoom.centerX * size.width - d / 2, y: zoom.centerY * size.height - d / 2)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
             .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                if case .active = phase { NSCursor.crosshair.set() } else { NSCursor.arrow.set() }
+            }
             .gesture(DragGesture(minimumDistance: 0).onChanged { g in
-                let (x, y) = ZoomPoint.clamped(x: g.location.x / size.width, y: g.location.y / size.height, scale: zoom.scale)
-                set(x, y)
-            })
+                if !dragging { dragging = true; began() }
+                set(min(max(g.location.x / size.width, 0), 1), min(max(g.location.y / size.height, 0), 1))
+            }.onEnded { _ in dragging = false })
         }
         .aspectRatio(aspect, contentMode: .fit)
         .frame(maxWidth: .infinity)
-    }
-}
-
-enum ZoomPoint {
-    /// Keeps a zoom's point where its whole area still fits in the frame, so the stored point
-    /// matches the box you see.
-    static func clamped(x: Double, y: Double, scale: Double) -> (Double, Double) {
-        let h = 0.5 / max(scale, 1)
-        return (min(max(x, h), 1 - h), min(max(y, h), 1 - h))
     }
 }
 

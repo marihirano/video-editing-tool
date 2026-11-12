@@ -1,20 +1,16 @@
 import EditorCore
 import SwiftUI
 
-/// Handles drawn on top of the preview:
-/// - crop mode: the crop box with corner and edge handles over the whole recording;
-/// - a selected zoom (paused, mouse off the timeline): the box the zoom will show, to drag into place.
+/// Handles drawn on top of the preview: in crop mode, the crop box with corner and edge handles
+/// over the whole recording. (Zooms always show for real in the preview; they're aimed in the side panel.)
 struct PreviewOverlay: View {
     @EnvironmentObject private var model: EditorModel
-    @EnvironmentObject private var playback: PlaybackController
 
     var body: some View {
         GeometryReader { geo in
             if let project = model.project {
                 if model.isCropMode {
                     CropHandles(content: viewRect(FrameLayout.contentRect(project: project, mode: .wholeFrame), in: geo.size))
-                } else if let i = model.selectedZoom, model.zooms.indices.contains(i), !playback.isPlaying, model.hoverTime == nil {
-                    ZoomAimBox(index: i, content: viewRect(FrameLayout.contentRect(project: project, mode: .withoutZoom), in: geo.size))
                 }
             }
         }
@@ -123,50 +119,5 @@ private struct CropHandles: View {
         if [.top, .topLeft, .topRight].contains(part) { y0 = min(max(r.minY + dy, 0), y1 - m) }
         if [.bottom, .bottomLeft, .bottomRight].contains(part) { y1 = max(min(r.maxY + dy, 1), y0 + m) }
         return CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
-    }
-}
-
-/// The area a selected zoom will show, over the un-zoomed frame. Drag to move it; click to centre it there.
-private struct ZoomAimBox: View {
-    @EnvironmentObject private var model: EditorModel
-    let index: Int
-    /// Where the (cropped) recording sits in the preview, in points.
-    let content: CGRect
-    @State private var startCenter: (Double, Double)?
-
-    var body: some View {
-        let zoom = model.zooms[index]
-        let t = ZoomCamera.targetRect(zoom, cropped: CGRect(x: 0, y: 0, width: 1, height: 1))
-        let box = CGRect(x: content.minX + t.minX * content.width, y: content.minY + t.minY * content.height,
-                         width: t.width * content.width, height: t.height * content.height)
-        let color = Color(rgba: Settings.timelineZoomColor)
-        ZStack(alignment: .topLeading) {
-            Path { p in p.addRect(content); p.addRect(box) }
-                .fill(Color.black.opacity(0.35), style: FillStyle(eoFill: true))
-            RoundedRectangle(cornerRadius: 4).path(in: box).stroke(color, lineWidth: 2.5)
-            Text("\(Int((zoom.scale * 100).rounded()))% zoom")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 7).padding(.vertical, 3)
-                .background(RoundedRectangle(cornerRadius: 4).fill(color))
-                .offset(x: box.minX + 6, y: box.minY + 6)
-        }
-        .contentShape(Rectangle())
-        .onContinuousHover { phase in
-            if case .active(let pt) = phase, startCenter == nil { (box.contains(pt) ? NSCursor.openHand : NSCursor.arrow).set() }
-        }
-        .gesture(DragGesture(minimumDistance: 0).onChanged { g in
-            if startCenter == nil {
-                if box.contains(g.startLocation) {
-                    startCenter = (Double(t.midX), Double(t.midY))
-                } else if content.contains(g.startLocation) {
-                    // Clicked outside the box: centre the zoom there, then keep following the drag.
-                    startCenter = (Double((g.startLocation.x - content.minX) / content.width), Double((g.startLocation.y - content.minY) / content.height))
-                } else { return }
-            }
-            guard let (cx, cy) = startCenter else { return }
-            let (x, y) = ZoomPoint.clamped(x: cx + g.translation.width / content.width, y: cy + g.translation.height / content.height, scale: zoom.scale)
-            model.updateZoom(index, group: "point") { $0.centerX = x; $0.centerY = y }
-        }.onEnded { _ in startCenter = nil })
     }
 }

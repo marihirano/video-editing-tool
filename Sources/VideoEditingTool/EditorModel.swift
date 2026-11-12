@@ -21,14 +21,14 @@ final class EditorModel: ObservableObject {
     @Published private var savedProject: Project?
     @Published private var history = UndoHistory<Project>()
     /// The blue line: where the mouse is over the timeline (finished-video seconds), or nil.
-    @Published private(set) var hoverTime: Double? { didSet { if (hoverTime == nil) != (oldValue == nil) { updatePreviewMode() } } }
+    @Published private(set) var hoverTime: Double?
     /// The blue line when not hovering: the last clicked spot (finished-video seconds). Split happens here.
     @Published private(set) var editTime: Double?
     /// The clip last clicked (highlighted), by its position on the timeline.
     @Published var selectedClip: Int? { didSet { if selectedClip != nil { selectedZoom = nil; isCropMode = false } } }
-    /// The zoom last clicked; its settings show in the side panel and a box on the preview aims it.
+    /// The zoom last clicked; its settings show in the side panel.
     @Published var selectedZoom: Int? {
-        didSet { if selectedZoom != nil { selectedClip = nil; isCropMode = false }; updatePreviewMode() }
+        didSet { if selectedZoom != nil { selectedClip = nil; isCropMode = false } }
     }
     /// True while the crop handles are on the preview.
     @Published private(set) var isCropMode = false { didSet { updatePreviewMode() } }
@@ -237,7 +237,28 @@ final class EditorModel: ObservableObject {
 
     /// Tells the preview what to leave out while editing on it.
     private func updatePreviewMode() {
-        drawer?.mode = isCropMode ? .wholeFrame : (selectedZoom != nil && hoverTime == nil ? .withoutZoom : .normal)
+        drawer?.mode = isCropMode ? .wholeFrame : .normal
+    }
+
+    /// Moves the playhead into the fully zoomed-in part of zoom `i` (unless it's already there),
+    /// so the preview shows the zoom while it's being aimed.
+    func showZoomInPreview(_ i: Int) {
+        guard let map = timeMap, zoomRanges.indices.contains(i), zooms.indices.contains(i), !playback.isPlaying else { return }
+        let r = zoomRanges[i]
+        let d = min(zooms[i].transition, (r.end - r.start) / 2)
+        let now = playback.outputTime
+        if now < r.start + d || now > r.end - d {
+            let mid = (r.start + r.end) / 2
+            editTime = mid
+            playback.seek(to: map.sourceTime(forOutput: mid))
+        }
+    }
+
+    /// Recording moment (seconds) shown in the zoom's "where it points" picture: its middle.
+    func zoomStillTime(_ i: Int) -> Double? {
+        guard let map = timeMap, zoomRanges.indices.contains(i) else { return nil }
+        let r = zoomRanges[i]
+        return map.sourceTime(forOutput: (r.start + r.end) / 2)
     }
 
     /// Name shown in the window title.

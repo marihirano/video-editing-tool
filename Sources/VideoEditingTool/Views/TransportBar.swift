@@ -20,11 +20,14 @@ struct TransportBar: View {
              + Text(" / \(Self.format(playback.outputDuration))").foregroundStyle(.secondary))
                 .font(.system(size: 15).monospacedDigit())
 
-            Button { model.splitAtEditPoint() } label: {
+            Button { model.toggleCutMode() } label: {
                 Image(systemName: "scissors").font(.system(size: 17))
+                    .foregroundStyle(model.isCutMode ? Color.white : Color.primary)
+                    .frame(width: 30, height: 26)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(model.isCutMode ? Color.accentColor : .clear))
             }
             .buttonStyle(.plain)
-            .help("Split the clip at the blue line (⌘B)")
+            .help(model.isCutMode ? "Click the timeline to cut there (Esc to stop)" : "Cut: click, then click the timeline where you want to cut")
             Spacer()
         }
     }

@@ -38,7 +38,7 @@ The whole pipeline, end to end, as plainly as possible.
 
 ### M3: Timeline
 - Timeline under the preview: a clip track and an (empty) zoom track, a gray playhead and a blue hover/edit line that the preview follows (no thumbnails, per Mari's 2026-11-12 design)
-- Split clips with the scissors; click a clip to speed it up or delete it (trimming = split + delete the end clip)
+- Split clips with the scissors tool (click scissors, then click the timeline); click a clip to set its speed or delete it in the side panel (trimming = split + delete the end clip)
 - Speed up clips (2×, 4×, 8×, or custom)
 - Undo and redo for every edit
 

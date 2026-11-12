@@ -9,10 +9,10 @@ enum DebugSnapshot {
         guard let path = ProcessInfo.processInfo.environment["VET_SNAPSHOT"] else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             let model = EditorModel.shared
-            // VET_SNAPSHOT_SPLIT=1 makes one split at a third of the way and pins the blue line there.
+            // VET_SNAPSHOT_SPLIT=1 cuts once with the scissors tool at a third of the way and pins the blue line there.
             if ProcessInfo.processInfo.environment["VET_SNAPSHOT_SPLIT"] != nil, let map = model.timeMap {
-                model.setEditPoint(map.outputDuration / 3)
-                model.splitAtEditPoint()
+                model.startCutMode()                       // same path as the scissors button
+                model.cut(atOutput: map.outputDuration / 3)
                 model.selectedClip = 1
             }
             model.playback.play()

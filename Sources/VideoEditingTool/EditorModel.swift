@@ -26,8 +26,9 @@ final class EditorModel: ObservableObject {
     @Published private(set) var editTime: Double?
     /// The clip last clicked (highlighted), by its position on the timeline.
     @Published var selectedClip: Int?
-    /// Clip waiting for a typed-in custom speed (shows the Custom speed box).
-    @Published var customSpeedClip: Int?
+    /// True while the scissors tool is out: the next click on the timeline cuts there.
+    @Published private(set) var isCutMode = false
+    private lazy var cutMode = CutMode { [weak self] in self?.endCutMode() }
     @Published var errorMessage: String?
     @Published var export: ExportState?
 
@@ -103,7 +104,29 @@ final class EditorModel: ObservableObject {
         playback.seek(to: map.sourceTime(forOutput: t))
     }
 
-    /// Scissors: splits the clip under the blue line (or the playhead if no line is set).
+    /// Scissors button: takes the scissors tool out, or puts it away if it's already out.
+    func toggleCutMode() { isCutMode ? endCutMode() : startCutMode() }
+
+    func startCutMode() {
+        guard project != nil else { return }
+        isCutMode = true
+        cutMode.start()
+    }
+
+    func endCutMode() {
+        isCutMode = false
+        cutMode.stop()
+    }
+
+    /// A click on the timeline with the scissors tool: splits the clip there and puts the tool away.
+    func cut(atOutput t: Double) {
+        let d = sourceDuration
+        edit { $0.timeline.split(atOutput: t, sourceDuration: d) }
+        setEditPoint(t)
+        endCutMode()
+    }
+
+    /// ⌘B: splits the clip under the blue line (or the playhead if no line is set).
     func splitAtEditPoint() {
         guard project != nil else { return }
         let t = blueLineTime ?? playback.outputTime

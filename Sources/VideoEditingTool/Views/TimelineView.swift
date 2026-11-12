@@ -5,13 +5,12 @@ import SwiftUI
 /// The bottom of the window: play / time / scissors, then two tracks.
 /// Top track: the clips (orange) that make up the video. Bottom track: zooms (empty until M4).
 /// The gray line is the playhead; the blue line follows the mouse (the preview shows that
-/// moment) and stays where you click. The scissors splits at the blue line; clicking a clip
-/// opens its menu (speed, delete).
+/// moment) and stays where you click. With the scissors tool out, a click cuts there.
+/// Clicking a clip selects it and shows its speed in the side panel.
 struct TimelineView: View {
     @EnvironmentObject private var model: EditorModel
     @EnvironmentObject private var playback: PlaybackController
     @State private var dragging = false
-    @State private var customSpeed = "3"
 
     private let trackH = Settings.timelineTrackHeight
     private let trackGap: CGFloat = 8
@@ -28,17 +27,6 @@ struct TimelineView: View {
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 16)
-        .alert("Custom speed", isPresented: Binding(get: { model.customSpeedClip != nil }, set: { if !$0 { model.customSpeedClip = nil } })) {
-            TextField("Speed", text: $customSpeed)
-            Button("Apply") {
-                let r = Double(customSpeed.replacingOccurrences(of: "×", with: "").replacingOccurrences(of: ",", with: ".")) ?? 0
-                if let i = model.customSpeedClip, Settings.customSpeedRange.contains(r) { model.setSpeed(r, ofClip: i) }
-                model.customSpeedClip = nil
-            }
-            Button("Cancel", role: .cancel) { model.customSpeedClip = nil }
-        } message: {
-            Text("How many times faster, from \(Self.speedLabel(Settings.customSpeedRange.lowerBound)) to \(Self.speedLabel(Settings.customSpeedRange.upperBound)).")
-        }
     }
 
     // MARK: Tracks
@@ -92,6 +80,7 @@ struct TimelineView: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { g in
+                    if model.isCutMode { return }
                     if abs(g.translation.width) > 3 { dragging = true }
                     if dragging { model.setEditPoint(t(g.location.x)) }
                 }
@@ -99,15 +88,11 @@ struct TimelineView: View {
                     defer { dragging = false }
                     guard !dragging else { return }
                     let time = t(g.location.x)
+                    if model.isCutMode { model.cut(atOutput: time); return }
                     model.setEditPoint(time)
+                    // Clicking a clip selects it; its speed settings show in the side panel.
                     let onClips = g.location.y >= clipTop && g.location.y <= clipTop + trackH
-                    if onClips, let map {
-                        let i = map.pieceIndex(atOutput: time)
-                        model.selectedClip = i
-                        DispatchQueue.main.async { ClipMenu.show(for: i, model: model) }
-                    } else {
-                        model.selectedClip = nil
-                    }
+                    if onClips, let map { model.selectedClip = map.pieceIndex(atOutput: time) }
                 }
         )
     }
@@ -153,47 +138,5 @@ private struct ClipBar: View {
                 }
         }
         .allowsHitTesting(false)
-    }
-}
-
-/// The menu that opens when a clip is clicked: speed choices, split, delete.
-@MainActor
-enum ClipMenu {
-    static func show(for i: Int, model: EditorModel) {
-        let clips = model.clips
-        guard clips.indices.contains(i) else { return }
-        let rate = clips[i].rate
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(.sectionHeader(title: "Speed"))
-        for r in [1.0] + Settings.speedPresets {
-            let item = ActionItem(r == 1 ? "Normal (1×)" : TimelineView.speedLabel(r)) { model.setSpeed(r, ofClip: i) }
-            item.state = abs(rate - r) < 0.001 ? .on : .off
-            menu.addItem(item)
-        }
-        let custom = ActionItem("Custom…") { model.customSpeedClip = i }
-        if !([1.0] + Settings.speedPresets).contains(where: { abs($0 - rate) < 0.001 }) {
-            custom.title = "Custom (\(TimelineView.speedLabel(rate)))…"
-            custom.state = .on
-        }
-        menu.addItem(custom)
-        menu.addItem(.separator())
-        menu.addItem(ActionItem("Split at Blue Line") { model.splitAtEditPoint() })
-        let delete = ActionItem("Delete Clip") { model.deleteClip(i) }
-        delete.isEnabled = clips.count > 1
-        menu.addItem(delete)
-        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-    }
-
-    /// A menu item that runs a closure.
-    final class ActionItem: NSMenuItem {
-        private let handler: () -> Void
-        init(_ title: String, handler: @escaping () -> Void) {
-            self.handler = handler
-            super.init(title: title, action: #selector(run), keyEquivalent: "")
-            target = self
-        }
-        required init(coder: NSCoder) { fatalError() }
-        @objc private func run() { handler() }
     }
 }

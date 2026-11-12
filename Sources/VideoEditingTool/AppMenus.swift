@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// File menu items: open, save, export.
@@ -28,7 +29,13 @@ struct AppMenus: Commands {
             Button("Split Clip at Blue Line") { model.splitAtEditPoint() }
                 .keyboardShortcut("b")
                 .disabled(model.project == nil)
-            Button("Delete Clip") { if let i = model.selectedClip { model.deleteClip(i) } }
+            Button("Delete Clip") {
+                // While typing (e.g. a custom speed), Delete just erases a character.
+                if NSApp.keyWindow?.firstResponder is NSTextView {
+                    NSApp.sendAction(#selector(NSText.deleteBackward(_:)), to: nil, from: nil); return
+                }
+                if let i = model.selectedClip { model.deleteClip(i) }
+            }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(model.selectedClip == nil || model.clips.count < 2)
         }

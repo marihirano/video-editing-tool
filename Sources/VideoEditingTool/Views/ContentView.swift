@@ -19,14 +19,19 @@ struct ContentView: View {
             }
             if model.project != nil && showInspector {
                 Divider()
-                InspectorView()
-                    .transition(.move(edge: .trailing))
+                Group {
+                    if let i = model.selectedClip, model.clips.indices.contains(i) { ClipInspector(index: i) }
+                    else { InspectorView() }
+                }
+                .transition(.move(edge: .trailing))
             }
         }
         .background(Color(rgba: Settings.previewSurround))
         .background(WindowCloseGuard())
         .navigationTitle(model.displayName)
         .toolbar { toolbar }
+        // Selecting a clip opens the side panel if it was hidden, to show the clip's speed.
+        .onChange(of: model.selectedClip) { if model.selectedClip != nil && !showInspector { withAnimation(.easeInOut(duration: 0.2)) { showInspector = true } } }
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first else { return false }
             Task { await model.open(url) }

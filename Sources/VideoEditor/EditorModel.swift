@@ -278,7 +278,7 @@ final class EditorModel: ObservableObject {
     /// Name shown in the window title.
     var displayName: String {
         if let projectURL { return projectURL.deletingPathExtension().lastPathComponent }
-        return sourceURL?.lastPathComponent ?? "Video Editing Tool"
+        return sourceURL?.lastPathComponent ?? "Video Editor"
     }
 
     // MARK: Opening

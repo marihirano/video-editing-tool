@@ -2,12 +2,12 @@ import AppKit
 import SwiftUI
 
 @main
-struct VideoEditingToolApp: App {
+struct VideoEditorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = EditorModel.shared
 
     var body: some Scene {
-        Window("Video Editing Tool", id: "editor") {
+        Window("Video Editor", id: "editor") {
             ContentView()
                 .environmentObject(model)
                 .environmentObject(model.playback)

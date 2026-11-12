@@ -1,17 +1,17 @@
 #!/bin/zsh
-# Builds a release version of the app and packages it as build/Video Editing Tool.app
+# Builds a release version of the app and packages it as build/Video Editor.app
 # Usage: scripts/build-app.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP="build/Video Editing Tool.app"
+APP="build/Video Editor.app"
 
-swift build -c release --product VideoEditingTool
-BIN="$(swift build -c release --product VideoEditingTool --show-bin-path)/VideoEditingTool"
+swift build -c release --product VideoEditor
+BIN="$(swift build -c release --product VideoEditor --show-bin-path)/VideoEditor"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/VideoEditingTool"
+cp "$BIN" "$APP/Contents/MacOS/VideoEditor"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # App icon (redraw it with: swift scripts/make-icon.swift)
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"

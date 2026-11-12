@@ -1,4 +1,4 @@
-# video-editing-tool
+# video-editor
 
 A native Mac app for editing screen recordings, in the spirit of Screen Studio: polished zooms, a styled frame and (later) a smooth styled cursor, exported quickly as MP4 or GIF. It's an original app. Don't copy Screen Studio's name, branding, art or UI.
 
@@ -20,10 +20,10 @@ This file is the shared memory for every Claude session on this project. Any age
 ## Current status
 
 - **Phase:** M5 (export options and polish) built and pushed on 2026-11-12, **waiting for Mari to try it**; this finishes the MVP build. M4, M3 and M2 are also still waiting for feedback. M1 was approved on 2026-11-10. Next: feedback rounds, then phase 2 (install Xcode first).
-- Git repo on branch `main`, remote `origin` = https://github.com/marihirano/video-editing-tool.git. Pushed to GitHub on 2026-11-10 (Mari approved). The `gh` tool isn't installed; use plain `git`.
-- **Build the app:** `scripts/build-app.sh` → `build/Video Editing Tool.app` (release build, ad-hoc signed). **Run checks:** `swift run CoreChecks` (project save/reopen, shader compile, layout, a real 1080p hardware export of a generated test video). XCTest and Swift Testing don't run without Xcode, so checks are a plain program.
-- **Screenshots:** the terminal has no screen-recording permission and computer use was off. `VET_SNAPSHOT=/path.png` makes the app save its window, log whether the preview drew video frames (`/path.png.txt`), and quit; launch with `open -n --env VET_SNAPSHOT=… -a "build/Video Editing Tool.app" video.mov`. The Metal preview itself is blank in that picture.
-- **Code map:** `Sources/EditorCore/` = `Settings.swift` (every tunable value), `Project/` (model, save/load, TimeMap), `Render/` (shaders as source text, FrameLayout steps crop → zoom → cursor → frame, FrameRenderer, MetalContext). `Views/InspectorView.swift` = the right-hand style panel; `EditorModel.updateStyle` changes the style and sets `hasUnsavedChanges`, `Playback/`, `Export/`. `Sources/VideoEditingTool/` = SwiftUI app, `EditorModel`, menus, `Views/`. `Resources/Info.plist` declares the `.vetproj` package type.
+- Git repo on branch `main`, remote `origin` = https://github.com/marihirano/video-editor.git. Pushed to GitHub on 2026-11-10 (Mari approved). The `gh` tool isn't installed; use plain `git`.
+- **Build the app:** `scripts/build-app.sh` → `build/Video Editor.app` (release build, ad-hoc signed). **Run checks:** `swift run CoreChecks` (project save/reopen, shader compile, layout, a real 1080p hardware export of a generated test video). XCTest and Swift Testing don't run without Xcode, so checks are a plain program.
+- **Screenshots:** the terminal has no screen-recording permission and computer use was off. `VET_SNAPSHOT=/path.png` makes the app save its window, log whether the preview drew video frames (`/path.png.txt`), and quit; launch with `open -n --env VET_SNAPSHOT=… -a "build/Video Editor.app" video.mov`. The Metal preview itself is blank in that picture.
+- **Code map:** `Sources/EditorCore/` = `Settings.swift` (every tunable value), `Project/` (model, save/load, TimeMap), `Render/` (shaders as source text, FrameLayout steps crop → zoom → cursor → frame, FrameRenderer, MetalContext). `Views/InspectorView.swift` = the right-hand style panel; `EditorModel.updateStyle` changes the style and sets `hasUnsavedChanges`, `Playback/`, `Export/`. `Sources/VideoEditor/` = SwiftUI app, `EditorModel`, menus, `Views/`. `Resources/Info.plist` declares the `.vetproj` package type.
 - **Style (M2):** `project.json` → `style` holds kind (wallpaper/gradient/solid/image), colours, wallpaper index, padding, corner radius and shadow. All defaults, ranges, gradients and wallpapers are in `Settings.swift`. Wallpapers are four-colour blends drawn by the shader (original, no image files). A custom background image is stored as an absolute path, so moving the picture breaks it (falls back to a blank background). Padding is % of canvas height; corners, blur and distance are pixels on a 1080-tall canvas and scale with output size. `CoreChecks` writes example frames if `VET_CHECK_FRAME_DIR=<folder>` is set.
 - **Timeline (M3):** `project.json` → `timeline.clips` = the pieces of the recording in the video, in order, each `{start, end, rate}` in source seconds (empty = whole recording). Split/delete/speed are in `Project/TimelineEdits.swift`; files from the first M3 build (`trim`/`cuts`/`speedSegments`) are read and turned into clips. `TimeMap` places clips on the finished video's clock and is used by both export and `PlaybackController` (jumps over deleted parts, sets `player.rate`). The timeline shows the finished video (deleted clips close up). Gray line = `playback.playheadTime`; blue line = `EditorModel.hoverTime ?? editTime`; hovering calls `playback.skim` so the preview shows that moment, click pins the blue line and moves the playhead. Scissors button = a cut tool (`CutMode.swift`: scissors pointer only over the timeline, kept up by an event monitor; every timeline click cuts until the scissors button is clicked again or Esc). Clicking a clip selects it and the side panel shows `ClipInspector` (speed, delete, "‹ Style" back). Top bar = SwiftUI `.toolbar` in `ContentView` (undo/redo, side-panel toggle, Export). Every edit goes through `EditorModel.edit` → `UndoHistory` (one slider drag = one step). Unsaved changes asked on open, quit and window close (`WindowCloseGuard`). `VET_SNAPSHOT_SPLIT=1` makes the debug snapshot cut once with the scissors tool and select clip 2; it also writes `…-top.png` with the top bar.
 - **Zoom (M4):** `project.json` → `timeline.zooms` = `{range (source seconds), centerX, centerY (0–1 of the cropped frame), scale, transition (output seconds), bounce (0–1)}`. Code: `Project/Zoom.swift` (`Spring` easing, add/move/resize/delete in output time, `ZoomCamera` = how far in and where at an output moment). **Zoom is a camera on the whole finished picture** (video, frame, shadow and background together; `FrameUniforms.camera`, `ZoomCamera.canvasTarget`): the framed video grows past the picture's edges instead of zooming inside its rectangle; the zoom's point is still on the video, and the view is centred on it and only stops at the picture's edges, so a point near the video's edge shows the padding and background there. Amount = how much the whole picture is magnified. `FrameLayout.uniforms` takes **output time** + the TimeMap (preview converts the frame's source time; export uses frame n / fps). Deleting a clip drops zooms that were only on it. Zooms never overlap. Zoom track (in `TimelineView`): hovering empty space shows a dashed "+" placeholder and a click adds that zoom (`Timeline.clickZoomRange`: 10% of the video, at least 1 s, starts at the click, slides earlier or shrinks to fit), drag on empty space adds one of any length, drag a block moves, drag its ends resizes, click selects → `ZoomInspector` (amount, "where it points", presets + curve + transition/bounce sliders, delete). The preview always shows the real zoom. "Where it points" = a still of the recording at the zoom's middle (`FrameStill.swift`, cropped like the video) with a circle to drag; starting a drag moves the playhead into the fully zoomed part (`EditorModel.showZoomInPreview`). The point can go anywhere 0–1; near an edge the zoom stops at the frame's edge. Delete key deletes the selected zoom.
@@ -43,7 +43,7 @@ This file is the shared memory for every Claude session on this project. Any age
 | Feature decisions (Now / Future / Maybe / Never) and effort | [FEATURES.md](FEATURES.md) |
 | Build plan and milestones | [PLAN.md](PLAN.md) |
 | Feature triage page (the source of truth for decisions) | https://claude.ai/artifact/ALXf7BAygL8xHEsJv6Gyy7, source [feature-triage.html](feature-triage.html) |
-| Project Drive entry | project `video-editing-tool` in `~/design-project-drive` |
+| Project Drive entry | project `video-editor` in `~/design-project-drive` |
 
 **Reading the triage page's decisions:** use the `ArtifactData` tool, `action: "list"`, collection `decisions`, on the artifact URL above. Each doc id is a feature id (like `zm-auto`) with `{status: "now" | "future" | "maybe" | "never"}`. The list of features with their ids is the `GROUPS` array in `feature-triage.html`. After Mari changes choices, sync FEATURES.md from the page.
 
@@ -51,7 +51,7 @@ This file is the shared memory for every Claude session on this project. Any age
 
 ## Project Drive filing
 
-This project is registered in Project Drive as `video-editing-tool` (see the global `~/.claude/CLAUDE.md`). File every new artifact the same session it's created, by running from this folder:
+This project is registered in Project Drive as `video-editor` (see the global `~/.claude/CLAUDE.md`). File every new artifact the same session it's created, by running from this folder:
 
 ```bash
 node ~/design-project-drive/sweep.mjs add --type <type> --url <url> --label "<short name>"
@@ -59,7 +59,7 @@ node ~/design-project-drive/sweep.mjs add --type <type> --url <url> --label "<sh
 
 - **Already filed:** the local folder; the triage page (as `deployment`, label "feature triage"); the GitHub repo.
 - **To file when created:** Figma files, any deployments.
-- Mari tags this project's links in her daily reflections with `#video-editing-tool`.
+- Mari tags this project's links in her daily reflections with `#video-editor`.
 
 ## The plan in brief
 
@@ -81,6 +81,8 @@ node ~/design-project-drive/sweep.mjs add --type <type> --url <url> --label "<sh
 ## Decision log
 
 Newest first. Each entry: date, decision, reason.
+
+- **2026-11-12** — **Renamed everything to `video-editor`** (it was `video-editing-tool`): the app ("Video Editor", bundle id `com.marihirano.video-editor`, Swift target `VideoEditor`), the local folder `~/video-editor`, the GitHub repo, Project Drive (the old name is kept as an alias, so old `#video-editing-tool` tags still match), the docs and the triage page. Project files keep the `.vetproj` extension, so saved projects still open. *Why:* Mari's call. Use `video-editor` for any new repo, Figma file or deployment, and `#video-editor` in reflections.
 
 - **2026-11-12** — **A zoom near the video's edge shows the padding and background (Mari).** The zoomed view is centred on the zoom's point and only stops at the edges of the whole picture (it no longer stays over the video). *Why:* matches Mari's reference video. A zoom pointing at the middle still shows only video.
 
@@ -114,7 +116,7 @@ Newest first. Each entry: date, decision, reason.
 - **2026-11-10** — **Native Mac app, not a web app or Electron.** *Why:* phase 2 needs the cursor position and clicks in other apps, which browsers can't see. Hardware encoding and smooth 4K preview also need native access. Mari asked and agreed after the explanation.
 - **2026-11-10** — **Feature triage finished:** 27 Now, 19 Future, 7 Maybe, 25 Never, out of 78 Screen Studio features. *Why:* Mari's picks on the triage page.
 - **2026-11-10** — **The triage page has four choices: Now, Future, Maybe, Never.** *Why:* Mari asked for a three-way choice, then added Maybe.
-- **2026-11-10** — **The project name is `video-editing-tool`,** the same as the folder. *Why:* Mari's pick. Use it for the repo, Figma file and deployment.
+- **2026-11-10** — **The project name was `video-editing-tool`,** the same as the folder (renamed on 2026-11-12, see above). *Why:* Mari's pick.
 
 ## Session log
 
@@ -153,4 +155,4 @@ Newest first. One or two lines per session.
 - **Autosave** is Maybe. Claude recommends building it into capture in phase 2, because it's cheap there.
 - **Edit by transcript and filler-word removal** are Future, but transcription is Never. They need a transcript, so revisit transcription if those move up.
 - **Hint for imported videos:** whether to tell people to record in the app to unlock auto-zoom. To decide in phase 2.
-- **App name and icon:** not decided. `video-editing-tool` is the project name for now.
+- **App name and icon:** not decided. `video-editor` is the project name for now.

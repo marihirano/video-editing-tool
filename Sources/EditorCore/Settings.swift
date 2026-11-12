@@ -8,7 +8,7 @@ public enum Settings {
     /// Extension of the project package (a folder that Finder shows as one file).
     public static let projectExtension = "vetproj"
     /// Uniform type id declared in the app's Info.plist for project packages.
-    public static let projectTypeIdentifier = "com.marihirano.video-editing-tool.project"
+    public static let projectTypeIdentifier = "com.marihirano.video-editor.project"
     /// Name of the edits file inside the project package.
     public static let projectFileName = "project.json"
     /// Version written into project.json, bumped when the format changes.

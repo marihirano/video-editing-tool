@@ -92,6 +92,7 @@ final class EditorModel: ObservableObject {
     /// Mouse over the timeline: the blue line follows and the preview shows that moment.
     func hover(at t: Double?) {
         hoverTime = t
+        cutMode.setOverTimeline(t != nil)
         guard let map = timeMap else { return }
         if let t { playback.skim(to: map.sourceTime(forOutput: t)) } else { playback.endSkim() }
     }

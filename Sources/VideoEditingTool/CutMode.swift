@@ -1,11 +1,13 @@
 import AppKit
 
-/// The scissors tool: after the scissors button is clicked, the pointer is a pair of scissors
-/// and every click on the timeline cuts there. Clicking the scissors button again (or Esc)
+/// The scissors tool: after the scissors button is clicked, the pointer becomes a pair of scissors
+/// while it's over the timeline (a regular arrow anywhere else), and every click on the timeline cuts there. Clicking the scissors button again (or Esc)
 /// puts the tool away.
 @MainActor
 final class CutMode {
     private var monitor: Any?
+    /// True while the mouse is over the timeline tracks.
+    private var overTimeline = false
     private let onCancel: () -> Void
 
     init(onCancel: @escaping () -> Void) { self.onCancel = onCancel }
@@ -32,17 +34,26 @@ final class CutMode {
     func start() {
         stop()
         NSApp.keyWindow?.acceptsMouseMovedEvents = true
-        Self.cursor.set()
+        if overTimeline { Self.cursor.set() }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .keyDown, .cursorUpdate]) { [weak self] event in
             guard let self else { return event }
             switch event.type {
             case .keyDown where event.keyCode == 53:   // Esc
                 self.onCancel(); return nil
             default:
-                DispatchQueue.main.async { if self.monitor != nil { Self.cursor.set() } }
+                // Other views reset the pointer as it moves; put the scissors back while over the timeline.
+                DispatchQueue.main.async { if self.monitor != nil && self.overTimeline { Self.cursor.set() } }
             }
             return event
         }
+    }
+
+    /// Called as the mouse enters or leaves the timeline.
+    func setOverTimeline(_ over: Bool) {
+        guard over != overTimeline else { return }
+        overTimeline = over
+        guard monitor != nil else { return }
+        (over ? Self.cursor : NSCursor.arrow).set()
     }
 
     func stop() {

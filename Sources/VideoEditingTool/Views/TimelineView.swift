@@ -7,7 +7,8 @@ import SwiftUI
 /// The gray line is the playhead; the blue line follows the mouse (the preview shows that
 /// moment) and stays where you click. With the scissors tool out, a click cuts there.
 /// Clicking a clip or a zoom selects it and shows its settings in the side panel.
-/// On the zoom track: drag across empty space to add a zoom, drag a zoom to move it,
+/// On the zoom track: click empty space to add a zoom of a second or two (a "+" placeholder shows
+/// where while hovering), or drag across it to add one of any length; drag a zoom to move it,
 /// drag its ends to make it longer or shorter.
 struct TimelineView: View {
     @EnvironmentObject private var model: EditorModel
@@ -17,6 +18,8 @@ struct TimelineView: View {
     @State private var moved = false
     /// The new zoom being drawn, in output seconds.
     @State private var ghost: TimeRange?
+    /// The zoom a click would add where the mouse is on the empty zoom track (output seconds).
+    @State private var placeholder: TimeRange?
 
     private enum DragKind {
         case scrub
@@ -40,6 +43,13 @@ struct TimelineView: View {
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 16)
+        .onAppear {
+            // For Claude's debug snapshot: VET_SNAPSHOT_PLACEHOLDER=1 shows the "+" placeholder at 70%.
+            guard ProcessInfo.processInfo.environment["VET_SNAPSHOT_PLACEHOLDER"] != nil else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {   // after the snapshot's own edits
+                if let map = model.timeMap { placeholder = model.project?.timeline.clickZoomRange(atOutput: map.outputDuration * 0.7, map: map) }
+            }
+        }
     }
 
     // MARK: Tracks
@@ -87,7 +97,7 @@ struct TimelineView: View {
             RoundedRectangle(cornerRadius: 6)
                 .fill(Color(rgba: Settings.timelineZoomTrackColor))
                 .overlay {
-                    if zooms.isEmpty && ghost == nil {
+                    if zooms.isEmpty && ghost == nil && placeholder == nil {
                         Text("Drag here to add a zoom").font(.callout).foregroundStyle(.white.opacity(0.35))
                     }
                 }
@@ -97,6 +107,11 @@ struct TimelineView: View {
                 ZoomBar(scale: zooms.indices.contains(i) ? zooms[i].scale : 1, selected: model.selectedZoom == i)
                     .frame(width: max(x(r.end) - x(r.start), 3), height: trackH)
                     .offset(x: x(r.start), y: zoomTop)
+            }
+            if let p = placeholder, ghost == nil, drag == nil {
+                ZoomPlaceholder()
+                    .frame(width: max(x(p.end) - x(p.start), 2), height: trackH)
+                    .offset(x: x(p.start), y: zoomTop)
             }
             if let g = ghost {
                 ZoomBar(scale: Settings.defaultZoomScale, selected: false)
@@ -121,18 +136,23 @@ struct TimelineView: View {
             switch phase {
             case .active(let p):
                 model.hover(at: t(p.x))
-                // Pointer hints on the zoom track: ↔ on a zoom's ends, a hand on a zoom, a crosshair to draw a new one.
-                guard !model.isCutMode, drag == nil else { break }
+                // Pointer hints on the zoom track: ↔ on a zoom's ends, an open hand on a zoom, and on empty
+                // space a pointing hand with a "+" placeholder showing the zoom a click would add.
+                guard !model.isCutMode, drag == nil else { placeholder = nil; break }
                 if onZoomTrack(p.y) {
                     switch zoomHit(p.x)?.1 {
-                    case .start?, .end?: NSCursor.resizeLeftRight.set()
-                    case .body?: NSCursor.openHand.set()
-                    case nil: NSCursor.crosshair.set()
+                    case .start?, .end?: placeholder = nil; NSCursor.resizeLeftRight.set()
+                    case .body?: placeholder = nil; NSCursor.openHand.set()
+                    case nil:
+                        placeholder = map.flatMap { model.project?.timeline.clickZoomRange(atOutput: t(p.x), map: $0) }
+                        (placeholder == nil ? NSCursor.arrow : NSCursor.pointingHand).set()
                     }
                 } else {
+                    placeholder = nil
                     NSCursor.arrow.set()
                 }
             case .ended:
+                placeholder = nil
                 model.hover(at: nil)
                 if !model.isCutMode { NSCursor.arrow.set() }
             }
@@ -187,7 +207,11 @@ struct TimelineView: View {
                         model.selectedClip = map.pieceIndex(atOutput: time)
                     } else if onZoomTrack(y) {
                         if let (i, _) = zoomHit(g.location.x) { model.selectedZoom = i }
-                        else { model.selectedZoom = nil; model.selectedClip = nil }
+                        else if let p = map.flatMap({ model.project?.timeline.clickZoomRange(atOutput: time, map: $0) }) {
+                            // Click on empty space: adds the zoom the placeholder showed.
+                            model.addZoom(from: p.start, to: p.end)
+                            placeholder = nil
+                        } else { model.selectedZoom = nil; model.selectedClip = nil }
                     }
                 }
         )
@@ -267,5 +291,17 @@ private struct ZoomBar: View {
     /// Small bars at each end of the selected zoom, hinting that the ends can be dragged.
     private var grip: some View {
         RoundedRectangle(cornerRadius: 1).fill(.white.opacity(0.85)).frame(width: 2, height: 14).padding(.horizontal, 4)
+    }
+}
+
+/// Where a click would add a zoom: a dashed purple outline with a "+" in the middle.
+private struct ZoomPlaceholder: View {
+    var body: some View {
+        let color = Color(rgba: Settings.timelineZoomColor)
+        RoundedRectangle(cornerRadius: 6)
+            .fill(color.opacity(0.22))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
+            .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white.opacity(0.9)))
+            .allowsHitTesting(false)
     }
 }

@@ -145,6 +145,23 @@ do {
     t2.resizeZoom(0, startEdge: true, toOutput: -3, map: m2)
     check(near(t2.zooms[0].range.start, 0), "resizing stops at the start of the video")
 
+    // Click on the empty zoom track: a second or two from the click, fitted into the free space.
+    var t3 = Timeline()
+    let m36 = TimeMap(timeline: t3, sourceDuration: 36)
+    let c1 = t3.clickZoomRange(atOutput: 10, map: m36)
+    check(c1 == TimeRange(start: 10, end: 11.8), "click adds 1.8 s (5% of a 36 s video) from the click")
+    check(t3.clickZoomRange(atOutput: 35.5, map: m36) == TimeRange(start: 34.2, end: 36), "near the end, the new zoom moves earlier to fit")
+    check(TimeMap(timeline: Timeline(), sourceDuration: 10).outputDuration == 10
+          && Timeline().clickZoomRange(atOutput: 2, map: TimeMap(timeline: Timeline(), sourceDuration: 10)) == TimeRange(start: 2, end: 3),
+          "short video: at least 1 s")
+    t3.addZoom(fromOutput: 11, to: 20, map: m36)
+    let sq = t3.clickZoomRange(atOutput: 10.5, map: m36)!
+    check(near(sq.start, 9.2) && near(sq.end, 11), "just before the next zoom, the new zoom moves earlier to fit")
+    let tiny = Timeline(zooms: [ZoomSegment(range: TimeRange(start: 0, end: 5)), ZoomSegment(range: TimeRange(start: 5.6, end: 9))])
+    let sh = tiny.clickZoomRange(atOutput: 5.2, map: m36)!
+    check(near(sh.start, 5) && near(sh.end, 5.6), "a small gap gets a shorter zoom that fills it")
+    check(t3.clickZoomRange(atOutput: 12, map: m36) == nil, "no placeholder on top of a zoom")
+
     // Camera.
     let cam = ZoomCamera(zooms: [ZoomSegment(range: TimeRange(start: 1, end: 5), centerX: 0.5, centerY: 0.5, scale: 2, transition: 1, bounce: 0)],
                          map: TimeMap(timeline: Timeline(), sourceDuration: 10))

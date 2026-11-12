@@ -87,7 +87,7 @@ public struct Timeline: Codable, Equatable, Sendable {
     public var legacyCuts: [TimeRange] = []
     public var legacySpeedSegments: [SpeedSegment] = []
 
-    public init() {}
+    public init(clips: [Clip] = [], zooms: [ZoomSegment] = []) { self.clips = clips; self.zooms = zooms }
 
     enum CodingKeys: String, CodingKey { case clips, zooms, audioTracks, trim, cuts, speedSegments }
     public init(from decoder: Decoder) throws {

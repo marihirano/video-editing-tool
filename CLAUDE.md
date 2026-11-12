@@ -58,8 +58,9 @@ This project is registered in Project Drive as `video-editor` (see the global `~
 node ~/design-project-drive/sweep.mjs add --type <type> --url <url> --label "<short name>"
 ```
 
-- **Already filed:** the local folder; the triage page (as `deployment`, label "feature triage"); the GitHub repo.
-- **To file when created:** Figma files, any deployments.
+- **Already filed:** the local folder; the GitHub repo. (Mari removed the triage page from the drive on 2026-11-10; don't re-add it.)
+- **Figma:** the design file `dpKwm3o8JehmFtDaPWkxTt` (still named "video-editing-tool" in Figma) and the FigJam Sprints page are in Mari's reflections with `#video-editor`, so the nightly sweep files them.
+- **To file when created:** any deployments.
 - Mari tags this project's links in her daily reflections with `#video-editor`.
 
 ## The plan in brief
@@ -123,7 +124,7 @@ Newest first. Each entry: date, decision, reason.
 
 Newest first. One or two lines per session.
 
-- **2026-11-12** — Renamed the project to `video-editor`: app, bundle id, Swift target, GitHub repo, Project Drive (alias kept), docs and triage page. Moved the folder to `~/video-editor`, then back to `~/video-editing-tool` because the Claude app hid the past conversations.
+- **2026-11-12** — Renamed the project to `video-editor`: app, bundle id, Swift target, GitHub repo, Project Drive (alias kept), docs and triage page. Moved the folder to `~/video-editor`, then back to `~/video-editing-tool` because the Claude app hid (archived) the past conversations; unarchived them. Changed `#video-editing-tool` to `#video-editor` in the 11/10 and 11/12 daily reflections.
 
 - **2026-11-12** — Fixed shaky edges while zooming in the preview: Mari's recording is 30 fps and the preview moved the zoom only when a new video frame arrived (uneven steps on a 60 Hz screen). The preview now times zooms by the playback clock. Export was already smooth (checked frame by frame on Mari's project). Added a debug export tool.
 

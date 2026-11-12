@@ -6,6 +6,7 @@
     <key>CFBundleDisplayName</key><string>Video Editing Tool</string>
     <key>CFBundleIdentifier</key><string>com.marihirano.video-editing-tool</string>
     <key>CFBundleExecutable</key><string>VideoEditingTool</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1</string>
     <key>CFBundleVersion</key><string>1</string>

@@ -121,6 +121,20 @@ public enum Settings {
     public static let undoLimit = 200
 
     // MARK: Export
+    /// Heights offered for MP4 (width follows at 16:9) and the frame rates offered.
+    public static let mp4Heights = [720, 1080, 2160]
+    public static let mp4FPSChoices = [30, 60]
+    /// GIF: heights up to 1080p; frame rates stay low because GIFs get big fast.
+    public static let gifHeights = [480, 720, 1080]
+    public static let gifFPSChoices = [10, 15, 20, 25]
+    public static let defaultGIFHeight = 720
+    public static let defaultGIFFPS = 15
+    /// How many moments of the video are sampled to pick the GIF colours and estimate its size.
+    public static let gifSampleCount = 8
+    /// Strength of the dithering that hides colour banding in gradients (0 = off), in 0–255 colour steps.
+    public static let gifDither = 7
+    /// How many finished frames the GPU may work ahead of the encoder (speeds up export).
+    public static let exportFramesInFlight = 4
     /// Video bitrate in bits per second per million output pixels. Screen content has
     /// sharp text, so this is generous: about 16 Mbit/s at 1080p.
     public static let exportBitsPerMegapixel: Double = 7_700_000

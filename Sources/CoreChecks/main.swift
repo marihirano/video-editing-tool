@@ -321,5 +321,95 @@ do {
     check(startOK, "zoom export starts un-zoomed (colour differences:\(startR))")
 }
 
+print("Export options (M5)")
+do {
+    // Choices are stored in the project and survive save and reopen; older files get defaults.
+    var proj = Project(source: SourceVideo(path: "/x.mov", width: 10, height: 10, duration: 1))
+    proj.output.setMP4Height(2160); proj.output.fps = 30
+    proj.output.format = .gif; proj.output.gifHeight = 480; proj.output.gifFPS = 10
+    let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(proj))
+    check(back.output == proj.output && back.output.width == 3840 && back.output.height == 2160, "export choices survive save and reopen")
+    let oldFile = #"{"source":{"path":"/x.mov","width":10,"height":10,"duration":1},"output":{"width":1920,"height":1080,"fps":60}}"#
+    let o = try JSONDecoder().decode(Project.self, from: Data(oldFile.utf8)).output
+    check(o.format == .mp4 && o.gifHeight == Settings.defaultGIFHeight && o.gifFPS == Settings.defaultGIFFPS, "files without export choices open with defaults")
+    check(OutputSettings.size(forHeight: 720).width == 1280 && OutputSettings.size(forHeight: 480).width == 854, "16:9 widths are even numbers")
+
+    let source = tmp.appendingPathComponent("m5-source.mov")
+    try await TestVideo.make(at: source, width: 1440, height: 900, seconds: 2, fps: 30)
+    let info = try await VideoInfo.load(source)
+
+    func probe(_ url: URL) async throws -> (CGSize, Double, Double) {
+        let asset = AVURLAsset(url: url)
+        let t = try await asset.loadTracks(withMediaType: .video)[0]
+        return (try await t.load(.naturalSize), try await asset.load(.duration).seconds, Double(try await t.load(.nominalFrameRate)))
+    }
+    for (height, fps) in [(720, 30), (2160, 30), (2160, 60)] {
+        var p = Project(source: info.sourceVideo)
+        p.output.setMP4Height(height); p.output.fps = fps
+        let url = tmp.appendingPathComponent("m5-\(height)-\(fps).mp4")
+        let started = Date()
+        try await Exporter().export(project: p, sourceURL: source, to: url) { _ in }
+        let (size, duration, rate) = try await probe(url)
+        check(size.height == CGFloat(height) && size.width == CGFloat(OutputSettings.size(forHeight: height).width)
+              && abs(duration - 2) < 0.1 && abs(rate - Double(fps)) < 1.5,
+              "MP4 \(height)p \(fps) fps: \(Int(size.width))×\(Int(size.height)), \(String(format: "%.2f", duration)) s, \(String(format: "%.1f", rate)) fps (took \(String(format: "%.1f", Date().timeIntervalSince(started))) s)")
+    }
+
+    // GIF: right size, frame count and length; the picture matches the MP4 export; the size guess is close.
+    var g = Project(source: info.sourceVideo)
+    g.output.format = .gif; g.output.gifHeight = 480; g.output.gifFPS = 10
+    let gifURL = tmp.appendingPathComponent("m5.gif")
+    let est = try await Exporter().estimateGIF(project: g, sourceURL: source)
+    try await Exporter().export(project: g, sourceURL: source, to: gifURL) { _ in }
+    let actual = (try FileManager.default.attributesOfItem(atPath: gifURL.path)[.size] as? Int) ?? 0
+    guard let src = CGImageSourceCreateWithURL(gifURL as CFURL, nil) else { fatalError("GIF unreadable") }
+    let count = CGImageSourceGetCount(src)
+    var total = 0.0
+    for i in 0..<count {
+        let props = CGImageSourceCopyPropertiesAtIndex(src, i, nil) as? [CFString: Any]
+        total += (props?[kCGImagePropertyGIFDictionary] as? [CFString: Any])?[kCGImagePropertyGIFUnclampedDelayTime] as? Double ?? 0
+    }
+    let first = CGImageSourceCreateImageAtIndex(src, 0, nil)
+    check(count == 20 && first?.width == 854 && first?.height == 480, "GIF 480p 10 fps: \(count) frames, \(first?.width ?? 0)×\(first?.height ?? 0)")
+    check(abs(total - 2) < 0.05, "GIF plays for 2 seconds (\(total))")
+    check(est.frames == 20 && est.bytes > actual / 2 && est.bytes < actual * 2, "GIF size guess \(est.bytes / 1024) KB is close to the real \(actual / 1024) KB")
+    func centre(_ img: CGImage) -> (Double, Double, Double) {
+        // Average a small block inside one tile (not on a sharp edge), so palette and dither noise cancel out.
+        let rep = NSBitmapImageRep(cgImage: img)
+        let x0 = Int(Double(img.width) * 0.19), y0 = Int(Double(img.height) * 0.23)
+        var sum = (0.0, 0.0, 0.0)
+        for y in y0..<y0 + 9 { for x in x0..<x0 + 9 {
+            let c = rep.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
+            sum.0 += c.redComponent * 255 / 81; sum.1 += c.greenComponent * 255 / 81; sum.2 += c.blueComponent * 255 / 81
+        } }
+        return sum
+    }
+    let gen = AVAssetImageGenerator(asset: AVURLAsset(url: tmp.appendingPathComponent("m5-720-30.mp4")))
+    gen.requestedTimeToleranceBefore = .zero; gen.requestedTimeToleranceAfter = .zero
+    let mp4Frame = try await gen.image(at: CMTime(seconds: 1, preferredTimescale: 600)).image
+    let gifFrame = CGImageSourceCreateImageAtIndex(src, 10, nil)!
+    let (a, b) = (centre(mp4Frame), centre(gifFrame))
+    check(abs(a.0 - b.0) + abs(a.1 - b.1) + abs(a.2 - b.2) < 45, "GIF frame looks like the MP4 frame (\(a) vs \(b))")
+    if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] { try? FileManager.default.copyItem(at: gifURL, to: URL(fileURLWithPath: dir).appendingPathComponent("m5.gif")) }
+}
+
+// Speed test, only when asked: VET_PERF=1 swift run -c release CoreChecks (makes a 4K, 30 s test recording).
+if ProcessInfo.processInfo.environment["VET_PERF"] != nil {
+    print("Speed")
+    let source = tmp.appendingPathComponent("perf-4k.mov")
+    var t0 = Date()
+    try await TestVideo.make(at: source, width: 3840, height: 2160, seconds: 30, fps: 30)
+    print(String(format: "  (made the test recording in %.1f s)", Date().timeIntervalSince(t0)))
+    let info = try await VideoInfo.load(source)
+    for (label, format, height, fps) in [("MP4 1080p60", OutputSettings.Format.mp4, 1080, 60), ("MP4 4K30", .mp4, 2160, 30), ("MP4 4K60", .mp4, 2160, 60), ("GIF 720p15", .gif, 720, 15)] {
+        var p = Project(source: info.sourceVideo)
+        p.output.format = format; p.output.setMP4Height(height); p.output.fps = fps; p.output.gifHeight = height; p.output.gifFPS = fps
+        t0 = Date()
+        try await Exporter().export(project: p, sourceURL: source, to: tmp.appendingPathComponent("perf.out")) { _ in }
+        let secs = Date().timeIntervalSince(t0)
+        print(String(format: "  %@: 30 s of 4K video exported in %.1f s (%.1f× real time)", label, secs, 30 / secs))
+    }
+}
+
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

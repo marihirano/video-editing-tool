@@ -77,7 +77,7 @@ extension ContentView {
             .disabled(model.project == nil)
         }
         ToolbarItem(placement: .primaryAction) {
-            Button("Export MP4") { model.startExport() }
+            Button("Export") { model.startExport() }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.project == nil || model.export != nil)
         }

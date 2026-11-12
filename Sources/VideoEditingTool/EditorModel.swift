@@ -43,6 +43,7 @@ final class EditorModel: ObservableObject {
     private var exporter: Exporter?
 
     enum ExportState: Equatable {
+        case choosing
         case running(progress: Double)
         case finished(URL)
         case failed(String)
@@ -175,6 +176,19 @@ final class EditorModel: ObservableObject {
         edit { added = $0.timeline.addZoom(fromOutput: a, to: b, map: map) }
         if let added { selectedZoom = added }
     }
+
+    /// Zoom menu / shortcut: adds the same zoom a click on the zoom track would, at the blue line (or playhead).
+    func addZoomAtEditPoint() {
+        guard let map = timeMap else { return }
+        let t = editTime ?? playback.outputTime
+        guard let r = project?.timeline.clickZoomRange(atOutput: t, map: map) else { NSSound.beep(); return }
+        addZoom(from: r.start, to: r.end)
+        setEditPoint(t)
+    }
+
+    /// Playback menu: jump to the start or end of the finished video.
+    func goToStart() { setEditPoint(0) }
+    func goToEnd() { if let d = timeMap?.outputDuration { setEditPoint(d) } }
 
     /// Moving a zoom block (one drag = one undo step).
     func moveZoom(_ i: Int, toStart t: Double) {
@@ -355,10 +369,30 @@ final class EditorModel: ObservableObject {
 
     // MARK: Exporting
 
+    /// Export button / menu: opens the options sheet. "Export…" in the sheet then asks where to save.
     func startExport() {
-        guard let project, let sourceURL, export == nil else { return }
-        let name = displayName.replacingOccurrences(of: "." + sourceURL.pathExtension, with: "") + ".mp4"
-        guard let outURL = FilePanels.chooseExportLocation(suggestedName: name) else { return }
+        guard project != nil, export == nil else { return }
+        export = .choosing
+    }
+
+    /// Changes the export choices (format, size, frame rate); saved with the project and undoable.
+    func setOutput(_ change: (inout OutputSettings) -> Void) {
+        edit(group: "output") { change(&$0.output) }
+    }
+
+    /// One line describing what the current choices will make, e.g. "1920×1080 · 60 fps".
+    var exportSummary: String {
+        guard let o = project?.output else { return "" }
+        return o.format == .gif ? "GIF \(o.gifSize.width)×\(o.gifSize.height) · \(o.gifFPS) fps"
+                                : "MP4 \(o.width)×\(o.height) · \(o.fps) fps"
+    }
+
+    func confirmExport() {
+        guard let project, let sourceURL, case .choosing? = export else { return }
+        let isGIF = project.output.format == .gif
+        let name = displayName.replacingOccurrences(of: "." + sourceURL.pathExtension, with: "") + (isGIF ? ".gif" : ".mp4")
+        export = nil
+        guard let outURL = FilePanels.chooseExportLocation(suggestedName: name, gif: isGIF) else { export = .choosing; return }
         playback.pause()
         let exporter = Exporter()
         self.exporter = exporter

@@ -30,10 +30,21 @@ enum DebugSnapshot {
                 model.setCrop(CGRect(x: 0.15, y: 0.1, width: 0.6, height: 0.7))
                 model.startCropMode()
             }
-            if env["VET_SNAPSHOT_ZOOM"] == nil && env["VET_SNAPSHOT_CROP"] == nil { model.playback.play() }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            // VET_SNAPSHOT_EXPORT=gif (or mp4) opens the export window with that format; it is saved as `…-sheet.png`.
+            if let format = env["VET_SNAPSHOT_EXPORT"] {
+                model.setOutput { $0.format = format == "gif" ? .gif : .mp4 }
+                model.startExport()
+            }
+            let busy = env["VET_SNAPSHOT_ZOOM"] != nil || env["VET_SNAPSHOT_CROP"] != nil || env["VET_SNAPSHOT_EXPORT"] != nil
+            if !busy { model.playback.play() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + (env["VET_SNAPSHOT_EXPORT"] != nil ? 5 : 1)) {
+                if let sheet = NSApp.windows.first(where: { $0.isSheet && $0.isVisible })?.contentView?.superview,
+                   let rep = sheet.bitmapImageRepForCachingDisplay(in: sheet.bounds) {
+                    sheet.cacheDisplay(in: sheet.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path + "-sheet.png"))
+                }
                 // The window content, plus the top bar on its own (`…-top.png`).
-                let content = NSApp.windows.first(where: { $0.isVisible })?.contentView
+                let content = NSApp.windows.first(where: { $0.isVisible && !$0.isSheet })?.contentView
                 for (view, file) in [(content, path), (content?.superview, path + "-top.png")] {
                     guard let view, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
                     view.cacheDisplay(in: view.bounds, to: rep)

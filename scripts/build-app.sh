@@ -13,6 +13,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/VideoEditingTool"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+# App icon (redraw it with: swift scripts/make-icon.swift)
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # Ad-hoc signature: enough to run on this Mac (no Apple developer account needed).
 codesign --force --sign - "$APP"

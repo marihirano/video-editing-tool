@@ -71,4 +71,4 @@ Before starting: install Xcode (free, from the App Store).
 
 ## Next step
 
-M2, M3 and M4 are built; Mari is trying them. Then M5.
+M2–M5 are built (the whole MVP); Mari is trying them. Then feedback rounds and phase 2.

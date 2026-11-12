@@ -1,22 +1,28 @@
+import AppKit
 import SwiftUI
 
-/// Shown when nothing is open: invites a drop or File › Open.
+/// Shown when nothing is open: the app icon, an invitation to drop a file, and the basics.
 struct EmptyStateView: View {
     @EnvironmentObject private var model: EditorModel
     let isTargeted: Bool
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "film.stack")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
-            Text("Drop a screen recording here")
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().frame(width: 96, height: 96)
+                .scaleEffect(isTargeted ? 1.08 : 1)
+            Text(isTargeted ? "Drop to open" : "Drop a screen recording here")
                 .font(.title2.weight(.medium))
-            Text("MOV or MP4 · or a saved project")
+            Text("MOV or MP4, or a saved project")
                 .foregroundStyle(.secondary)
             Button("Choose a File…") { Task { await model.showOpenPanel() } }
                 .controlSize(.large)
                 .padding(.top, 6)
+            Text("Then: cut with the scissors (⌘T), add zooms on the zoom track, style the frame on the right, and Export (⌘E).")
+                .font(.callout).foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
+                .padding(.top, 18)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(

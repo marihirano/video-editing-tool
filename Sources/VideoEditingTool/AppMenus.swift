@@ -1,9 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// File menu items: open, save, export.
+/// The menu bar: File (open, save, export), Edit (undo, split, delete, tools), View, Playback.
 struct AppMenus: Commands {
     @ObservedObject var model: EditorModel
+    @AppStorage("showInspector") private var showInspector = true
+
+    private var noProject: Bool { model.project == nil }
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -13,10 +16,10 @@ struct AppMenus: Commands {
         CommandGroup(replacing: .saveItem) {
             Button("Save Project") { model.save() }
                 .keyboardShortcut("s")
-                .disabled(model.project == nil)
+                .disabled(noProject)
             Button("Save Project As…") { model.saveAs() }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
-                .disabled(model.project == nil)
+                .disabled(noProject)
         }
         CommandGroup(replacing: .undoRedo) {
             Button("Undo") { model.undo() }
@@ -28,7 +31,7 @@ struct AppMenus: Commands {
             Divider()
             Button("Split Clip at Blue Line") { model.splitAtEditPoint() }
                 .keyboardShortcut("b")
-                .disabled(model.project == nil)
+                .disabled(noProject)
             Button(model.selectedZoom != nil ? "Delete Zoom" : "Delete Clip") {
                 // While typing (e.g. a custom speed), Delete just erases a character.
                 if NSApp.keyWindow?.firstResponder is NSTextView {
@@ -39,11 +42,40 @@ struct AppMenus: Commands {
             }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(model.selectedZoom == nil && (model.selectedClip == nil || model.clips.count < 2))
+            Divider()
+            Button(model.isCutMode ? "Put Scissors Away" : "Scissors Tool") { model.toggleCutMode() }
+                .keyboardShortcut("t")
+                .disabled(noProject)
+            Button(model.isCropMode ? "Done Cropping" : "Crop…") { model.toggleCropMode() }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .disabled(noProject)
+            Button("Add Zoom at Blue Line") { model.addZoomAtEditPoint() }
+                .keyboardShortcut("z", modifiers: [.command, .option])
+                .disabled(noProject)
         }
         CommandGroup(replacing: .importExport) {
-            Button("Export MP4…") { model.startExport() }
+            Button("Export…") { model.startExport() }
                 .keyboardShortcut("e")
-                .disabled(model.project == nil || model.export != nil)
+                .disabled(noProject || model.export != nil)
+        }
+        CommandGroup(after: .sidebar) {
+            Button(showInspector ? "Hide Side Panel" : "Show Side Panel") {
+                withAnimation(.easeInOut(duration: 0.2)) { showInspector.toggle() }
+            }
+                .keyboardShortcut("s", modifiers: [.command, .option])
+                .disabled(noProject)
+        }
+        CommandMenu("Playback") {
+            // Space plays and pauses (handled by the play button, so typing a space in a text field still works).
+            Button(model.playback.isPlaying ? "Pause  (Space)" : "Play  (Space)") { model.playback.togglePlay() }
+                .disabled(noProject)
+            Divider()
+            Button("Go to Start") { model.goToStart() }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled(noProject)
+            Button("Go to End") { model.goToEnd() }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+                .disabled(noProject)
         }
     }
 }

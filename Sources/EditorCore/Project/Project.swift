@@ -65,10 +65,35 @@ public struct SourceVideo: Codable, Equatable, Sendable {
 /// Size and frame rate of the exported video. A setting from day one, so other
 /// aspect ratios are cheap to add later.
 public struct OutputSettings: Codable, Equatable, Sendable {
+    public enum Format: String, Codable, Sendable { case mp4, gif }
+    /// MP4 size and frame rate (width/height stay 16:9; see `OutputSettings.size(forHeight:)`).
     public var width: Int = Settings.defaultOutputWidth
     public var height: Int = Settings.defaultOutputHeight
     public var fps: Int = Settings.defaultOutputFPS
+    /// What the Export button makes, and the GIF's own height and frame rate.
+    public var format: Format = .mp4
+    public var gifHeight: Int = Settings.defaultGIFHeight
+    public var gifFPS: Int = Settings.defaultGIFFPS
     public init() {}
+
+    enum CodingKeys: String, CodingKey { case width, height, fps, format, gifHeight, gifFPS }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        width = try c.decodeIfPresent(Int.self, forKey: .width) ?? width
+        height = try c.decodeIfPresent(Int.self, forKey: .height) ?? height
+        fps = try c.decodeIfPresent(Int.self, forKey: .fps) ?? fps
+        format = try c.decodeIfPresent(Format.self, forKey: .format) ?? format
+        gifHeight = try c.decodeIfPresent(Int.self, forKey: .gifHeight) ?? gifHeight
+        gifFPS = try c.decodeIfPresent(Int.self, forKey: .gifFPS) ?? gifFPS
+    }
+
+    /// A 16:9 canvas of the given height (width rounded to an even number).
+    public static func size(forHeight h: Int) -> (width: Int, height: Int) {
+        (Int((Double(h) * 16 / 9 / 2).rounded()) * 2, h)
+    }
+
+    public mutating func setMP4Height(_ h: Int) { let s = Self.size(forHeight: h); width = s.width; height = s.height }
+    public var gifSize: (width: Int, height: Int) { Self.size(forHeight: gifHeight) }
 }
 
 /// Edits over time.

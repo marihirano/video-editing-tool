@@ -27,9 +27,9 @@ enum FilePanels {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    static func chooseExportLocation(suggestedName: String) -> URL? {
+    static func chooseExportLocation(suggestedName: String, gif: Bool = false) -> URL? {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.mpeg4Movie]
+        panel.allowedContentTypes = [gif ? .gif : .mpeg4Movie]
         panel.nameFieldStringValue = suggestedName
         return panel.runModal() == .OK ? panel.url : nil
     }

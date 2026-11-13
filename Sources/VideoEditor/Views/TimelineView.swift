@@ -49,7 +49,7 @@ struct TimelineView: View {
         .frame(height: totalH)
         .padding(.horizontal, Theme.timelineMargin)
         .padding(.top, Theme.s5)
-        .padding(.bottom, Theme.s4)
+        .padding(.bottom, Theme.s4 + 16)
         .onAppear {
             // For Claude's debug snapshot: VET_SNAPSHOT_PLACEHOLDER=1 shows the "+" placeholder at 70%.
             guard ProcessInfo.processInfo.environment["VET_SNAPSHOT_PLACEHOLDER"] != nil else { return }
@@ -262,18 +262,18 @@ struct TimelineView: View {
 
     private enum Part { case start, end, body }
 
-    private static let handleW: CGFloat = 12
+    private static let handleW: CGFloat = 4
     private static let handleH: CGFloat = 14
     /// How far the lines reach below the zoom track.
     private static let lineOverhang = CGFloat(Settings.timelineLineOverhang)
 
-    /// The playhead: a 2 pt white line starting 14 pt down, with a 12 pt round handle (3 pt down) in the ruler.
+    /// The playhead: a 1 pt white line with a 4 pt round handle in the ruler (its centre 9 pt down, where the line starts).
     private var playheadLine: some View {
         ZStack(alignment: .top) {
-            Rectangle().fill(Theme.playhead).frame(width: 2, height: totalH + Self.lineOverhang - 14)
-                .offset(y: 14)
+            Rectangle().fill(Theme.playhead).frame(width: 1, height: totalH + Self.lineOverhang - 9)
+                .offset(y: 9)
             Circle().fill(Theme.playhead).frame(width: Self.handleW, height: Self.handleW)
-                .offset(y: 3)
+                .offset(y: 7)
         }
         .frame(width: Self.handleW, height: totalH + Self.lineOverhang, alignment: .top)
         .allowsHitTesting(false)
@@ -294,7 +294,7 @@ struct TimelineView: View {
             Text(text).font(Theme.fontSmall.monospacedDigit()).foregroundStyle(Theme.secondaryText)
                 .fixedSize()
                 .frame(width: labelW, height: labelH)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Theme.accent))
+                .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Color(rgba: Settings.timelineEditTagColor)))
                 .offset(x: labelX, y: labelTop)
         }
         .allowsHitTesting(false)
@@ -319,7 +319,7 @@ private struct ClipBar: View {
     var body: some View {
         GeometryReader { geo in
             RoundedRectangle(cornerRadius: Theme.radius)
-                .fill((selected ? Theme.clipSelected : Theme.clip).opacity(Settings.timelineBarOpacity))
+                .fill((selected ? Theme.clipSelected : Theme.clip).opacity(Settings.timelineClipOpacity))
                 .innerShadow(radius: Theme.radius, color: .black.opacity(0.25), y: 7, blur: 20)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.clipSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
                 .overlay(alignment: .leading) {

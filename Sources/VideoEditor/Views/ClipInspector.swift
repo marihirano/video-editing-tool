@@ -7,6 +7,8 @@ struct ClipInspector: View {
     @EnvironmentObject private var model: EditorModel
     let index: Int
     @State private var customText = ""
+    /// True after clicking Custom: shows the number field (it also shows whenever the speed isn't a preset).
+    @State private var customOpen = false
     @FocusState private var customFocused: Bool
 
     /// The speed choices: 1×, the presets, and "Custom" (lit when the speed is none of those).
@@ -19,10 +21,10 @@ struct ClipInspector: View {
             case .custom: return "Custom"
             }
         }
-        func isSelected(rate: Double) -> Bool {
+        func isSelected(rate: Double, customOpen: Bool) -> Bool {
             switch self {
-            case .preset(let r): return abs(rate - r) < 0.001
-            case .custom: return !([1.0] + Settings.speedPresets).contains { abs(rate - $0) < 0.001 }
+            case .preset(let r): return !customOpen && abs(rate - r) < 0.001
+            case .custom: return customOpen || !([1.0] + Settings.speedPresets).contains { abs(rate - $0) < 0.001 }
             }
         }
     }
@@ -34,18 +36,20 @@ struct ClipInspector: View {
             PanelHeader(back: { model.selectedClip = nil }, title: "Clip \(index + 1) of \(clips.count)")
 
             PanelSection("Speed") {
-                ChoiceButtons(choices: SpeedChoice.all, isSelected: { $0.isSelected(rate: clip.rate) },
+                ChoiceButtons(choices: SpeedChoice.all, isSelected: { $0.isSelected(rate: clip.rate, customOpen: customOpen) },
                               label: { $0.label }) { choice in
                     switch choice {
-                    case .preset(let r): model.setSpeed(r, ofClip: index)
-                    case .custom: customFocused = true
+                    case .preset(let r): customOpen = false; model.setSpeed(r, ofClip: index)
+                    case .custom: customOpen = true; DispatchQueue.main.async { customFocused = true }   // the field appears first
                     }
                 }
-                HStack(spacing: Theme.s2) {
-                    Text("Custom").font(Theme.fontCallout)
-                    Spacer()
-                    NumberField(text: $customText, suffix: "×", focused: $customFocused) { applyCustom() }
-                    Button("Apply") { applyCustom() }.buttonStyle(QuietButtonStyle())
+                if SpeedChoice.custom.isSelected(rate: clip.rate, customOpen: customOpen) {
+                    HStack(spacing: Theme.s2) {
+                        Text("Custom").font(Theme.fontCallout)
+                        Spacer()
+                        NumberField(text: $customText, suffix: "×", focused: $customFocused) { applyCustom() }
+                        Button("Apply") { applyCustom() }.buttonStyle(QuietButtonStyle())
+                    }
                 }
             }
         } footer: {
@@ -61,7 +65,7 @@ struct ClipInspector: View {
         }
         .onAppear { customText = Self.number(clip.rate) }
         .onChange(of: clip.rate) { customText = Self.number(clip.rate) }
-        .onChange(of: index) { customText = Self.number(clip.rate) }
+        .onChange(of: index) { customOpen = false; customText = Self.number(clip.rate) }
     }
 
     private func applyCustom() {

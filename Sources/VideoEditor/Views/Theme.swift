@@ -43,7 +43,7 @@ enum Theme {
     static let panelPadding: CGFloat = 20    // inside the side panel
     static let windowMargin: CGFloat = 24    // left and right of the preview and panel
     static let panelGap: CGFloat = 32        // between the preview and the side panel
-    static let timelineMargin: CGFloat = 22.5 // left and right of the timeline
+    static let timelineMargin: CGFloat = 24   // left and right of the timeline
     static let transportHeight: CGFloat = 64 // the tools / play / time row under the preview
     static let cropRowHeight: CGFloat = 48   // the Crop button centred above the preview
     static let sectionGap: CGFloat = 32      // between sections of a panel

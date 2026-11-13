@@ -1,39 +1,61 @@
 import EditorCore
 import SwiftUI
 
-/// Play/pause, the time in the finished video, the scissors (cut tool) and crop.
+/// The row under the preview. Left: the Cut, Crop and Zoom tools. Centre: play/pause and the
+/// time in the finished video. The right is left empty so play stays centred.
 struct TransportBar: View {
     @EnvironmentObject private var model: EditorModel
     @EnvironmentObject private var playback: PlaybackController
 
     var body: some View {
-        HStack(spacing: Theme.s3) {
-            Button { playback.togglePlay() } label: {
-                Image(systemName: playback.isPlaying ? "pause.circle" : "play.circle")
-                    .font(.system(size: 22, weight: .light))
+        ZStack {
+            HStack(spacing: Theme.s1) {
+                ToolButton(title: "Cut", systemImage: "scissors", isOn: model.isCutMode,
+                           help: model.isCutMode ? "Click the timeline to cut; click Cut again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut") {
+                    model.toggleCutMode()
+                }
+                ToolButton(title: "Crop", systemImage: "crop", isOn: model.isCropMode,
+                           help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
+                    model.toggleCropMode()
+                }
+                ToolButton(title: "Zoom", systemImage: "plus.magnifyingglass",
+                           help: "Add a zoom at the blue line (⌥⌘Z)") {
+                    model.addZoomAtEditPoint()
+                }
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.space, modifiers: [])
-            .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
 
-            (Text(Self.format(playback.outputTime)).foregroundStyle(.primary)
-             + Text(" / \(Self.format(playback.outputDuration))").foregroundStyle(Theme.secondaryText))
-                .font(.system(size: 14).monospacedDigit())
+            HStack(spacing: Theme.s3) {
+                Button { playback.togglePlay() } label: {
+                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.playGlyph)
+                        .offset(x: playback.isPlaying ? 0 : 1)   // a play triangle looks centred a touch right
+                        .frame(width: Theme.playButtonSize, height: Theme.playButtonSize)
+                        .background(Circle().fill(Theme.playFill))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.space, modifiers: [])
+                .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
 
-            ToolButton(systemImage: "scissors", isOn: model.isCutMode,
-                       help: model.isCutMode ? "Click the timeline to cut; click the scissors again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut") {
-                model.toggleCutMode()
+                (Text(Self.tenths(playback.outputTime)).fontWeight(.medium).foregroundStyle(.primary)
+                 + Text(" / \(Self.tenths(playback.outputDuration))").foregroundStyle(Theme.secondaryText))
+                    .font(.system(size: 14).monospacedDigit())
             }
-            ToolButton(systemImage: "crop", isOn: model.isCropMode,
-                       help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
-                model.toggleCropMode()
-            }
-            Spacer()
         }
+        .frame(height: Theme.playButtonSize)
     }
 
+    /// "0:05": minutes and whole seconds (the ruler's labels).
     static func format(_ seconds: Double) -> String {
-        let s = Int(max(seconds, 0).rounded(.down))
+        let s = Int(max(seconds, 0).rounded())
         return String(format: "%d:%02d", s / 60, s % 60)
+    }
+
+    /// "0:19.4": minutes, seconds and tenths.
+    static func tenths(_ seconds: Double) -> String {
+        let t = Int((max(seconds, 0) * 10).rounded())
+        return String(format: "%d:%02d.%d", t / 600, (t / 10) % 60, t % 10)
     }
 }

@@ -2,10 +2,12 @@ import AppKit
 import EditorCore
 import SwiftUI
 
-/// The bottom of the window: play / time / scissors / crop, then two tracks.
+/// The bottom of the window, across its whole width: a time ruler and two tracks, with a small icon
+/// per track in a gutter on the left. (The tools / play / time row sits under the preview.)
 /// Top track: the clips (orange) that make up the video. Bottom track: the zooms (purple).
-/// The gray line is the playhead; the blue line follows the mouse (the preview shows that
-/// moment) and stays where you click. With the scissors tool out, a click cuts there.
+/// The white line (with a handle in the ruler) is the playhead; the thin blue line follows the
+/// mouse (the preview shows that moment, its time shows in the ruler) and stays where you click.
+/// Clicking or dragging in the ruler works like clicking empty time. With the scissors tool out, a click cuts there.
 /// Clicking a clip or a zoom selects it and shows its settings in the side panel.
 /// On the zoom track: click empty space to add a zoom (10% of the video) (a "+" placeholder shows
 /// where while hovering), or drag across it to add one of any length; drag a zoom to move it,
@@ -30,18 +32,20 @@ struct TimelineView: View {
 
     private let trackH = Settings.timelineTrackHeight
     private let trackGap: CGFloat = Theme.s2
-    private let knob: CGFloat = 9
+    private let rulerH = Settings.timelineRulerHeight
+    private let gutterW = Settings.timelineGutterWidth
+    private var totalH: CGFloat { rulerH + trackH * 2 + trackGap }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            TransportBar()
+        HStack(spacing: 0) {
+            gutter
             GeometryReader { geo in
                 tracks(width: max(geo.size.width, 1))
             }
-            .frame(height: knob + trackH * 2 + trackGap)
         }
+        .frame(height: totalH)
         .padding(.horizontal, Theme.panelPadding)
-        .padding(.top, Theme.s3)
+        .padding(.top, Theme.s5)
         .padding(.bottom, Theme.s4)
         .onAppear {
             // For Claude's debug snapshot: VET_SNAPSHOT_PLACEHOLDER=1 shows the "+" placeholder at 70%.
@@ -50,6 +54,46 @@ struct TimelineView: View {
                 if let map = model.timeMap { placeholder = model.project?.timeline.clickZoomRange(atOutput: map.outputDuration * 0.7, map: map) }
             }
         }
+    }
+
+    // MARK: Gutter and ruler
+
+    /// A small icon left of each track: a film strip for clips, a magnifier for zooms.
+    private var gutter: some View {
+        ZStack(alignment: .topLeading) {
+            trackIcon("film", help: "Clips").offset(y: rulerH)
+            trackIcon("magnifyingglass", help: "Zooms").offset(y: rulerH + trackH + trackGap)
+        }
+        .frame(width: gutterW, height: totalH, alignment: .topLeading)
+    }
+
+    private func trackIcon(_ name: String, help: String) -> some View {
+        Image(systemName: name).font(.system(size: 13)).foregroundStyle(Theme.trackIcon)
+            .frame(width: gutterW, height: trackH, alignment: .leading)
+            .accessibilityLabel(help)
+            .help(help)
+    }
+
+    /// Ticks and times along the top. The step (1 s, 2 s, 5 s…) is the smallest that keeps labels apart.
+    private func ruler(width w: CGFloat, total: Double) -> some View {
+        let step = Settings.timelineRulerSteps.first { $0 / total * w >= Settings.timelineRulerMinLabelSpacing }
+            ?? Settings.timelineRulerSteps.last!
+        let count = Int(total / step)
+        let ticks = (0...max(count, 0)).map { Double($0) * step }
+            .filter { CGFloat($0 / total) * w <= w - 30 }   // room for the last label
+        return ZStack(alignment: .topLeading) {
+            ForEach(ticks, id: \.self) { t in
+                HStack(alignment: .top, spacing: Theme.s1) {
+                    Rectangle().fill(Theme.rulerTick).frame(width: 1, height: rulerH - 2)
+                    Text(TransportBar.format(t)).font(.system(size: 11).monospacedDigit()).foregroundStyle(Theme.rulerText)
+                        .fixedSize()
+                }
+                .offset(x: CGFloat(t / total) * w, y: 2)
+            }
+            Rectangle().fill(Theme.rulerLine).frame(width: w, height: 1).offset(y: rulerH - 1)
+        }
+        .frame(width: w, height: rulerH, alignment: .topLeading)
+        .allowsHitTesting(false)
     }
 
     // MARK: Tracks
@@ -61,9 +105,8 @@ struct TimelineView: View {
         let t = { (x: CGFloat) in min(max(Double(x / w) * total, 0), total) }
         let clips = model.clips
         let starts = map?.pieces.map(\.outputStart) ?? []
-        let clipTop = knob
-        let zoomTop = knob + trackH + trackGap
-        let lineH = trackH * 2 + trackGap + 4
+        let clipTop = rulerH
+        let zoomTop = rulerH + trackH + trackGap
         let zoomRanges = model.zoomRanges
         let zooms = model.zooms
 
@@ -84,6 +127,7 @@ struct TimelineView: View {
         func onZoomTrack(_ y: CGFloat) -> Bool { y >= zoomTop && y <= zoomTop + trackH }
 
         return ZStack(alignment: .topLeading) {
+            ruler(width: w, total: total)
             // Clips.
             ForEach(Array(clips.enumerated()), id: \.offset) { i, c in
                 let gap = clips.count > 1 ? Settings.timelineClipGap / 2 : 0
@@ -98,7 +142,7 @@ struct TimelineView: View {
                 .fill(Color(rgba: Settings.timelineZoomTrackColor))
                 .overlay {
                     if zooms.isEmpty && ghost == nil && placeholder == nil {
-                        Text("Drag here to add a zoom").font(.callout).foregroundStyle(Theme.tertiaryText)
+                        Text("Click or drag to add a zoom").font(.callout).foregroundStyle(Theme.tertiaryText)
                     }
                 }
                 .frame(width: w, height: trackH)
@@ -119,18 +163,16 @@ struct TimelineView: View {
                     .frame(width: max(x(g.end) - x(g.start), 2), height: trackH)
                     .offset(x: x(g.start), y: zoomTop)
             }
-            // Gray line: the playhead.
-            if let map {
-                line(color: Color(rgba: Settings.timelinePlayheadColor), height: lineH)
-                    .offset(x: x(map.outputTime(forSource: playback.playheadTime)) - knob / 2)
-            }
-            // Blue line: under the mouse, or where you last clicked.
+            // Blue line: under the mouse, or where you last clicked, with its time in the ruler.
             if let b = model.blueLineTime {
-                line(color: Color(rgba: Settings.timelineEditLineColor), height: lineH)
-                    .offset(x: x(min(b, total)) - knob / 2)
+                editLine(at: x(min(b, total)), time: min(b, total), width: w)
+            }
+            // White line on top: the playhead, with its handle in the ruler.
+            if let map {
+                playheadLine.offset(x: x(map.outputTime(forSource: playback.playheadTime)) - Self.handleW / 2)
             }
         }
-        .frame(width: w, height: knob + trackH * 2 + trackGap, alignment: .topLeading)
+        .frame(width: w, height: totalH, alignment: .topLeading)
         .contentShape(Rectangle())
         .onContinuousHover { phase in
             switch phase {
@@ -219,13 +261,43 @@ struct TimelineView: View {
 
     private enum Part { case start, end, body }
 
-    /// A vertical line with a round knob on top, spanning both tracks.
-    private func line(color: Color, height: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            Circle().fill(color).frame(width: knob, height: knob)
-            Rectangle().fill(color).frame(width: 2, height: height)
+    private static let handleW: CGFloat = 12
+    private static let handleH: CGFloat = 14
+    /// How far the lines reach below the zoom track.
+    private static let lineOverhang: CGFloat = 2
+
+    /// The playhead: a 2 pt white line with a handle (rounder at the bottom) sitting in the ruler.
+    private var playheadLine: some View {
+        let top: CGFloat = 4
+        return ZStack(alignment: .top) {
+            Rectangle().fill(Theme.playhead).frame(width: 2, height: totalH - top - Self.handleH / 2 + Self.lineOverhang)
+                .offset(y: Self.handleH / 2)
+            UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 6, bottomTrailingRadius: 6, topTrailingRadius: 3)
+                .fill(Theme.playhead).frame(width: Self.handleW, height: Self.handleH)
         }
-        .frame(width: knob)
+        .frame(width: Self.handleW, alignment: .top)
+        .offset(y: top)
+        .allowsHitTesting(false)
+    }
+
+    /// The blue line: 1 pt, no knob, with a small label of its time (tenths) above it, kept inside the timeline.
+    private func editLine(at px: CGFloat, time: Double, width w: CGFloat) -> some View {
+        let text = TransportBar.tenths(time)
+        let labelH: CGFloat = 17, labelTop: CGFloat = 1
+        // Width of the label: digits are about 6.7 pt at 11 pt semibold, ":" and "." about 3.2 pt, plus 5 pt padding each side.
+        let digits = text.filter(\.isNumber).count
+        let labelW = CGFloat(digits) * 6.7 + CGFloat(text.count - digits) * 3.2 + 10
+        let labelX = min(max(px - labelW / 2, 0), w - labelW)
+        let lineTop = labelTop + labelH
+        return ZStack(alignment: .topLeading) {
+            Rectangle().fill(Theme.editLine).frame(width: 1, height: totalH - lineTop + Self.lineOverhang)
+                .offset(x: px - 0.5, y: lineTop)
+            Text(text).font(.system(size: 11, weight: .semibold).monospacedDigit()).foregroundStyle(.white)
+                .fixedSize()
+                .frame(width: labelW, height: labelH)
+                .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Theme.accent))
+                .offset(x: labelX, y: labelTop)
+        }
         .allowsHitTesting(false)
     }
 
@@ -240,7 +312,7 @@ struct TimelineView: View {
     }
 }
 
-/// One clip: an orange bar labelled with its length in the video and its speed.
+/// One clip: an orange bar labelled on the left with its length in the video and its speed.
 private struct ClipBar: View {
     let clip: Clip
     let selected: Bool
@@ -248,14 +320,18 @@ private struct ClipBar: View {
     var body: some View {
         GeometryReader { geo in
             RoundedRectangle(cornerRadius: Theme.radius)
-                .fill(Theme.clip)
-                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Color.white, lineWidth: selected ? 2 : 0))
-                .overlay {
+                .fill((selected ? Theme.clipSelected : Theme.clip).opacity(Settings.timelineBarOpacity))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.clipSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
+                .overlay(alignment: .leading) {
                     if geo.size.width > 56 {
-                        Text("\(TimelineView.lengthLabel(clip.outputDuration)) \(TimelineView.speedLabel(clip.rate))")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
+                        HStack(spacing: Theme.s2) {
+                            Text(TimelineView.lengthLabel(clip.outputDuration)).fontWeight(.semibold)
+                            Text(TimelineView.speedLabel(clip.rate)).fontWeight(.medium).opacity(0.8)
+                        }
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.clipLabel)
+                        .lineLimit(1)
+                        .padding(.leading, Theme.barLabelInset)
                     }
                 }
         }
@@ -263,7 +339,7 @@ private struct ClipBar: View {
     }
 }
 
-/// One zoom: a purple block labelled with how far it zooms ("150% zoom").
+/// One zoom: a purple block labelled on the left with how far it zooms ("150%").
 private struct ZoomBar: View {
     let scale: Double
     let selected: Bool
@@ -272,14 +348,17 @@ private struct ZoomBar: View {
         GeometryReader { geo in
             let percent = "\(Int((scale * 100).rounded()))%"
             RoundedRectangle(cornerRadius: Theme.radius)
-                .fill(Theme.zoom)
-                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Color.white, lineWidth: selected ? 2 : 0))
-                .overlay {
-                    if geo.size.width > 40 {
-                        Text(geo.size.width > 96 ? "\(percent) zoom" : percent)
-                            .font(.system(size: 13, weight: .medium))
+                .fill(Theme.zoom.opacity(Settings.timelineBarOpacity))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.zoomSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
+                .overlay(alignment: .leading) {
+                    // When selected, the label moves right so it never sits under the left grip.
+                    let inset = selected ? Theme.barLabelInset + 8 : Theme.barLabelInset
+                    if geo.size.width > inset + 34 {
+                        Text(percent)
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
+                            .padding(.leading, inset)
                     }
                 }
                 .overlay(alignment: .leading) { if selected { grip } }
@@ -290,7 +369,7 @@ private struct ZoomBar: View {
 
     /// Small bars at each end of the selected zoom, hinting that the ends can be dragged.
     private var grip: some View {
-        RoundedRectangle(cornerRadius: 1).fill(.white.opacity(0.85)).frame(width: 2, height: 14).padding(.horizontal, 4)
+        RoundedRectangle(cornerRadius: 1).fill(.white.opacity(0.85)).frame(width: 2, height: 14).padding(.horizontal, 6)
     }
 }
 

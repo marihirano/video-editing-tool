@@ -25,13 +25,13 @@ struct ExportSheet: View {
                 HStack {
                     Spacer()
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(QuietButtonStyle())
-                    Button("Done") { model.dismissExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large)
+                    Button("Done") { model.dismissExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(Theme.accent).controlSize(.large)
                 }
             case .failed(let message):
                 Label("Export failed", systemImage: "exclamationmark.triangle.fill")
                     .font(.headline).foregroundStyle(.orange)
                 Text(message).foregroundStyle(Theme.secondaryText)
-                HStack { Spacer(); Button("OK") { model.dismissExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large) }
+                HStack { Spacer(); Button("OK") { model.dismissExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(Theme.accent).controlSize(.large) }
             case nil:
                 EmptyView()
             }
@@ -73,7 +73,7 @@ private struct ExportOptions: View {
         HStack {
             Spacer()
             Button("Cancel") { model.dismissExport() }.buttonStyle(QuietButtonStyle()).keyboardShortcut(.cancelAction)
-            Button("Export…") { model.confirmExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large)
+            Button("Export…") { model.confirmExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(Theme.accent).controlSize(.large)
         }
     }
 

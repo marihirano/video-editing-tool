@@ -26,7 +26,7 @@ struct ZoomInspector: View {
             }
 
             PanelSection(title: "Where it points") {
-                Button("Centre") { model.updateZoom(index, group: "point") { $0.centerX = 0.5; $0.centerY = 0.5 } }
+                Button("Center") { model.updateZoom(index, group: "point") { $0.centerX = 0.5; $0.centerY = 0.5 } }
                     .buttonStyle(QuietButtonStyle())
             } content: {
                 FocusPicker(zoom: zoom, aspect: cropAspect, image: still) {
@@ -47,7 +47,7 @@ struct ZoomInspector: View {
                     model.updateZoom(index, group: "preset") { $0.transition = p.transition; $0.bounce = p.bounce }
                 }
                 EasingCurve(bounce: zoom.bounce).frame(height: 54)
-                SliderRow(title: "Transition", valueText: String(format: "%.1fs", zoom.transition),
+                SliderRow(title: "Transition", valueText: String(format: "%.1f s", zoom.transition),
                           value: binding(\.transition, group: "transition"), range: Settings.zoomTransitionRange)
                 SliderRow(title: "Bounce", valueText: "\(Int((zoom.bounce * 100).rounded()))%",
                           value: binding(\.bounce, group: "bounce"), range: 0...1)

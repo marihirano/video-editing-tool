@@ -9,15 +9,16 @@ struct InspectorView: View {
 
     var body: some View {
         PanelScaffold {
+            PanelHeader(title: "Style", detail: "Background, frame and shadow")
             PanelSection("Background") { backgroundControls }
             PanelSection("Frame") {
                 slider("Padding", value: \.padding, range: Settings.paddingRange, unit: "%")
-                slider("Corners", value: \.cornerRadius, range: Settings.cornerRadiusRange, unit: "")
+                slider("Corners", value: \.cornerRadius, range: Settings.cornerRadiusRange, unit: " px")
             }
             PanelSection("Shadow") {
                 slider("Opacity", value: \.shadowOpacity, range: Settings.shadowOpacityRange, unit: "", scale: 100, suffix: "%")
-                slider("Blur", value: \.shadowBlur, range: Settings.shadowBlurRange, unit: "")
-                slider("Distance", value: \.shadowOffset, range: Settings.shadowOffsetRange, unit: "")
+                slider("Blur", value: \.shadowBlur, range: Settings.shadowBlurRange, unit: " px")
+                slider("Distance", value: \.shadowOffset, range: Settings.shadowOffsetRange, unit: " px")
             }
             Button("Reset style") { model.updateStyle { $0 = FrameStyle() } }
                 .buttonStyle(QuietButtonStyle())
@@ -40,11 +41,10 @@ struct InspectorView: View {
 
         switch style.kind {
         case .wallpaper:
-            swatchGrid {
+            swatchGrid(columns: 4) {
                 ForEach(Array(Settings.wallpapers.enumerated()), id: \.offset) { i, w in
                     swatch(selected: style.wallpaper == i, name: w.name,
-                           fill: AnyShapeStyle(LinearGradient(colors: [w.colors[0], w.colors[1], w.colors[3], w.colors[2]].map { Color(rgba: $0) },
-                                                              startPoint: .topLeading, endPoint: .bottomTrailing))) {
+                           fill: AnyShapeStyle(Color.clear), image: WallpaperSwatch.image(w)) {
                         model.updateStyle { $0.wallpaper = i }
                     }
                 }
@@ -80,14 +80,16 @@ struct InspectorView: View {
         }
     }
 
-    private func swatchGrid<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s2), count: 3), spacing: Theme.s2, content: content)
+    private func swatchGrid<C: View>(columns: Int = 3, @ViewBuilder _ content: () -> C) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s2), count: columns), spacing: Theme.s2, content: content)
     }
 
-    private func swatch(selected: Bool, name: String, fill: AnyShapeStyle, action: @escaping () -> Void) -> some View {
+    private func swatch(selected: Bool, name: String, fill: AnyShapeStyle, image: CGImage? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             RoundedRectangle(cornerRadius: Theme.radius)
                 .fill(fill)
+                .overlay { if let image { Image(decorative: image, scale: 1).resizable() } }
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
                 .frame(height: 38)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(selected ? Theme.accent : Theme.hairline, lineWidth: selected ? 2 : 1))
         }

@@ -60,6 +60,9 @@ public enum Settings {
         .init(name: "Meadow", colors: [RGBAColor(hex: 0x0F3B2E), RGBAColor(hex: 0x7BD88F), RGBAColor(hex: 0xE8F5A3), RGBAColor(hex: 0x1F7A6B)]),
         .init(name: "Ember", colors: [RGBAColor(hex: 0x1A0F1F), RGBAColor(hex: 0xFF5F3D), RGBAColor(hex: 0xFFB347), RGBAColor(hex: 0xB8325A)]),
     ]
+    /// The interface's accent blue (selected choices, tools that are on, the main button). A little
+    /// deeper than the system blue so white text on it is easy to read.
+    public static let accentColor = RGBAColor(hex: 0x0A6FE0)
     /// Colour of the app window behind the preview.
     public static let previewSurround = RGBAColor(r: 0.11, g: 0.11, b: 0.12, a: 1)
 
@@ -76,15 +79,31 @@ public enum Settings {
     public static let timelineTrackHeight: Double = 44
     /// Gap drawn between clips on the timeline, in points.
     public static let timelineClipGap: Double = 4
-    /// Timeline colours: clips, the blue edit line, the gray playhead, the (empty) zoom track.
+    /// Timeline colours: clips (and the selected clip), the clip label (white), the blue edit line,
+    /// the white playhead, and the (empty) zoom track.
     public static let timelineClipColor = RGBAColor(hex: 0xE8900C)
-    public static let timelineEditLineColor = RGBAColor(hex: 0x1F8BFF)
-    public static let timelinePlayheadColor = RGBAColor(hex: 0x8E8E93)
+    public static let timelineSelectedClipColor = RGBAColor(hex: 0xF6A833)
+    public static let timelineClipLabelColor = RGBAColor(r: 1, g: 1, b: 1, a: 1)
+    public static let timelineEditLineColor = RGBAColor(hex: 0x4D9BFF)
+    public static let timelinePlayheadColor = RGBAColor(r: 1, g: 1, b: 1, a: 1)
     public static let timelineZoomTrackColor = RGBAColor(hex: 0x241C38)
+    /// How solid the clip and zoom bars' fill is (labels and the selection ring stay fully solid).
+    public static let timelineBarOpacity = 0.6
+    /// Lighter purple for the ring around the selected zoom (the selected clip's ring uses the selected-clip orange).
+    public static let timelineSelectedZoomColor = RGBAColor(hex: 0xA48BFF)
+    /// Width of the ring around the selected clip or zoom, in points.
+    public static let timelineSelectionRingWidth: Double = 1
     /// Zoom blocks on the zoom track.
     public static let timelineZoomColor = RGBAColor(hex: 0x7B5CF0)
     /// Width of the grab area at each end of a zoom block for resizing, in points.
     public static let timelineZoomEdgeGrab: Double = 7
+    /// Time ruler above the tracks: its height, the steps it can count in (seconds), and the
+    /// least room between two labels (points); the smallest step that leaves that room is used.
+    public static let timelineRulerHeight: Double = 22
+    public static let timelineRulerSteps: [Double] = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600]
+    public static let timelineRulerMinLabelSpacing: Double = 60
+    /// Room left of the tracks for each track's small icon, in points.
+    public static let timelineGutterWidth: Double = 28
 
     // MARK: Zoom
     /// How far a new zoom goes (1.5 = 150%), and the range of the Amount slider.

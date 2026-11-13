@@ -9,6 +9,8 @@ enum DebugSnapshot {
         guard let path = ProcessInfo.processInfo.environment["VET_SNAPSHOT"] else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             let model = EditorModel.shared
+            // VET_SNAPSHOT_APPEARANCE=light|dark|system forces the look for this run only (nothing is saved).
+            if let mode = ProcessInfo.processInfo.environment["VET_SNAPSHOT_APPEARANCE"] { Theme.AppearanceMode.apply(mode) }
             // VET_SNAPSHOT_SPLIT=1 cuts once with the scissors tool at a third of the way and pins the blue line there.
             if ProcessInfo.processInfo.environment["VET_SNAPSHOT_SPLIT"] != nil, let map = model.timeMap {
                 model.startCutMode()                       // same path as the scissors button

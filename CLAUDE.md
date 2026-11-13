@@ -20,11 +20,38 @@ This file is the shared memory for every Claude session on this project. Any age
 ## Current status
 
 - **Local folder:** `~/video-editing-tool` (the old name, on purpose, so past conversations stay visible in the Claude app). Everything else is named `video-editor`. Don't rename the folder.
-- **Phase:** **MVP done.** Mari signed off M1 (2026-11-10) and M2–M5 plus the polish pass (2026-11-12). **Next: phase 2 (record in the app), starting with P1. Mari installs Xcode first.**
+- **Phase:** **MVP done.** Mari signed off M1 (2026-11-10) and M2–M5 plus the polish pass (2026-11-12). **Light mode is built and waiting for Mari's review (2026-11-13). Order from here: light mode → video shape (16:9 / 1:1 / 9:16) → phase 2 (capture + cursor; auto-zoom was dropped).**
 - Git repo on branch `main`, remote `origin` = https://github.com/marihirano/video-editor.git. Pushed to GitHub on 2026-11-10 (Mari approved). The `gh` tool isn't installed; use plain `git`.
 - **Build the app:** `scripts/build-app.sh` → `build/Video Editor.app` (release build, ad-hoc signed). **Run checks:** `swift run CoreChecks` (project save/reopen, shader compile, layout, a real 1080p hardware export of a generated test video). XCTest and Swift Testing don't run without Xcode, so checks are a plain program.
 - **Screenshots:** the terminal has no screen-recording permission and computer use was off. `VET_SNAPSHOT=/path.png` makes the app save its window, log whether the preview drew video frames (`/path.png.txt`), and quit; launch with `open -n --env VET_SNAPSHOT=… -a "build/Video Editor.app" video.mov`. The Metal preview itself is blank in that picture.
 - **Code map:** `Sources/EditorCore/` = `Settings.swift` (every tunable value), `Project/` (model, save/load, TimeMap), `Render/` (shaders as source text, FrameLayout steps crop → zoom → cursor → frame, FrameRenderer, MetalContext). `Views/InspectorView.swift` = the right-hand style panel; `EditorModel.updateStyle` changes the style and sets `hasUnsavedChanges`, `Playback/`, `Export/`. `Sources/VideoEditor/` = SwiftUI app, `EditorModel`, menus, `Views/`. `Resources/Info.plist` declares the `.vetproj` package type.
+- **Light mode (2026-11-13):** `Theme.AppearanceMode` (System / Light / Dark, saved under `Theme.appearanceKey` = "appearance", default System) is set from View › Appearance (`AppMenus`) and applied with `NSApp.appearance` (`nil` = follow the Mac live). There is no top-bar button any more. Every colour that differs is built with `Theme.adaptive(dark:light:)` in `Theme.swift`; dark values still come from `Settings.swift`. The video, preview and export never change. Snapshots: `VET_SNAPSHOT_APPEARANCE=light|dark|system` forces a mode for that run only. **Palette = Claude's calls, for Mari to review.** Contrast: body text black on white 21:1, secondary text 7.0:1 on the panel (6.7:1 on the window), tertiary (ruler, slider values) 5.2:1, white labels on the clip bar 4.9:1 and on the zoom bar 4.5:1, white on the accent button 5.4:1.
+
+  | Colour (`Theme`) | Dark | Light |
+  |---|---|---|
+  | `windowBackground` | #1C1C1F | #F2F2F4 |
+  | `panelFill` | #262628 | #FFFFFF |
+  | text | system white | system black |
+  | `secondaryText` | white 62% | black 65% |
+  | `tertiaryText`, `rulerText` | white 45% | black 58% |
+  | `accent`, `playhead` | #0095A3 | #007683 |
+  | `link` | #6CB0FF | #007683 |
+  | `controlFill` / `controlHover` / `hairline` | primary 8% / 14% / 12% | same (black) |
+  | `sliderTrack` | white 8% | black 14% |
+  | `sliderThumb` | #96BABE | #5B9AA2 |
+  | `playFill` | #F2F2F3 | #1D1D1F |
+  | `clipBar` | #DE2A78 38% | #C81F68 92% |
+  | `clipBarSelected` | #F57AA8 38% | #9E1650 95% |
+  | `clipSelected` (ring) | #F57AA8 | #FFFFFF |
+  | `zoomBar` | #007683 45% | #007683 92% |
+  | `zoomSelected` (ring) | #3CC8D6 | #FFFFFF |
+  | `zoomTrack` | #14282C | #E3EFF1 |
+  | `zoomPlus` | white 90% | #007683 |
+  | `editLine` | white 30% | black 30% |
+  | `editTag` | #3A3A3D | #E4E4E7 |
+  | `rulerTick` | white 28% | black 50% |
+  | `barInnerShadow` | black 25% | black 18% |
+
 - **Style (M2):** `project.json` → `style` holds kind (wallpaper/gradient/solid/image), colours, wallpaper index, padding, corner radius and shadow. All defaults, ranges, gradients and wallpapers are in `Settings.swift`. Wallpapers are four-colour blends drawn by the shader (original, no image files). A custom background image is stored as an absolute path, so moving the picture breaks it (falls back to a blank background). Padding is % of canvas height; corners, blur and distance are pixels on a 1080-tall canvas and scale with output size. `CoreChecks` writes example frames if `VET_CHECK_FRAME_DIR=<folder>` is set.
 - **Timeline (M3):** `project.json` → `timeline.clips` = the pieces of the recording in the video, in order, each `{start, end, rate}` in source seconds (empty = whole recording). Split/delete/speed are in `Project/TimelineEdits.swift`; files from the first M3 build (`trim`/`cuts`/`speedSegments`) are read and turned into clips. `TimeMap` places clips on the finished video's clock and is used by both export and `PlaybackController` (jumps over deleted parts, sets `player.rate`). The timeline shows the finished video (deleted clips close up). Gray line = `playback.playheadTime`; blue line = `EditorModel.hoverTime ?? editTime`; hovering calls `playback.skim` so the preview shows that moment, click pins the blue line and moves the playhead. Scissors button = a cut tool (`CutMode.swift`: scissors pointer only over the timeline, kept up by an event monitor; every timeline click cuts until the scissors button is clicked again or Esc). Clicking a clip selects it and the side panel shows `ClipInspector` (speed, delete, "‹ Style" back). Top bar = SwiftUI `.toolbar` in `ContentView` (undo/redo, side-panel toggle, Export). Every edit goes through `EditorModel.edit` → `UndoHistory` (one slider drag = one step). Unsaved changes asked on open, quit and window close (`WindowCloseGuard`). `VET_SNAPSHOT_SPLIT=1` makes the debug snapshot cut once with the scissors tool and select clip 2; it also writes `…-top.png` with the top bar.
 - **Zoom (M4):** `project.json` → `timeline.zooms` = `{range (source seconds), centerX, centerY (0–1 of the cropped frame), scale, transition (output seconds), bounce (0–1)}`. Code: `Project/Zoom.swift` (`Spring` easing, add/move/resize/delete in output time, `ZoomCamera` = how far in and where at an output moment). **Zoom is a camera on the whole finished picture** (video, frame, shadow and background together; `FrameUniforms.camera`, `ZoomCamera.canvasTarget`): the framed video grows past the picture's edges instead of zooming inside its rectangle; the zoom's point is still on the video, and the view is centred on it and only stops at the picture's edges, so a point near the video's edge shows the padding and background there. Amount = how much the whole picture is magnified. `FrameLayout.uniforms` takes **output time** + the TimeMap (preview converts the frame's source time; export uses frame n / fps). Deleting a clip drops zooms that were only on it. Zooms never overlap. Zoom track (in `TimelineView`): hovering empty space shows a dashed "+" placeholder and a click adds that zoom (`Timeline.clickZoomRange`: 10% of the video, at least 1 s, starts at the click, slides earlier or shrinks to fit), drag on empty space adds one of any length, drag a block moves, drag its ends resizes, click selects → `ZoomInspector` (amount, "where it points", presets + curve + transition/bounce sliders, delete). The preview always shows the real zoom. "Where it points" = a still of the recording at the zoom's middle (`FrameStill.swift`, cropped like the video) with a circle to drag; starting a drag moves the playhead into the fully zoomed part (`EditorModel.showZoomInPreview`). The point can go anywhere 0–1; near an edge the zoom stops at the frame's edge. Delete key deletes the selected zoom.
@@ -36,7 +63,7 @@ This file is the shared memory for every Claude session on this project. Any age
 - **Type (2026-11-13):** all text is **Inter, regular weight only**: no bold, semibold or medium anywhere. Sizes are `Theme.fontLarge/Title/Body/Callout/Small/Caption` (17/15/13/12/11/10) and `Theme.font(_:)`; never use `.font(.callout)` or `.weight(...)` in views. The font file is `Resources/Fonts/Inter.woff2` (variable Inter 5.3, OFL licence beside it), copied into the app by `build-app.sh` and loaded at start-up (`Theme.registerFonts`). The ruler's blue time label width is measured for Inter (`TimelineView`). Icons use SF Symbols at `.light` weight (about 1 px lines); the play/pause button is a plain solid light icon with no circle (Mari, 2026-11-13). System dialogs (the unsaved-changes prompt) keep the system font.
 - **Known check quirk:** `swift run -c release CoreChecks` fails "edited export shows the right moments" (first sample 13/6). It fails the same way on the M4 commit, so it predates M5; the normal (debug) run passes. Probably a frame-boundary rounding edge.
 - **Known M1 limits:** rotated videos (phone footage) aren't turned upright; colour is passed through as-is (no Display P3 → BT.709 conversion); unsaved-changes prompt added in M3.
-- Xcode is **not installed** (only the command-line tools, Swift 6.3.2). That's fine for the MVP. Mari installs Xcode before phase 2.
+- **Xcode is now installed but its licence isn't accepted,** so plain `swift build` stops with "You have not agreed to the Xcode license agreements". Mari needs to run `sudo xcodebuild -license` once in a Terminal (needed anyway for phase 2). Until then Claude builds with `DEVELOPER_DIR=/Library/Developer/CommandLineTools swift build` (same for `swift run CoreChecks` and `scripts/build-app.sh`).
 - Mari's Mac: macOS 26.6, Apple silicon (arm64).
 
 ## Files and links
@@ -149,6 +176,8 @@ Newest first. Each entry: date, decision, reason.
 ## Session log
 
 Newest first. One or two lines per session.
+
+- **2026-11-13** — Light mode: committed the earlier styling (`d561349`) and the doc decisions (`75068ea`: auto-zoom dropped, video shape to Now). Built the light palette, System / Light / Dark in View › Appearance (replacing the rough top-bar toggle), light-aware slider track and inner shadows, snapshot flag. `swift build` and `swift run CoreChecks` pass; app rebuilt; snapshots of both modes checked on a scratch copy. Xcode licence blocks plain `swift build` (see Current status). Then (Mari): tried see-through bars with dark labels in light mode and went back to the solid bars with white labels; the selected clip/zoom ring is white in light mode. Light-mode code and this file not committed; not pushed.
 
 - **2026-11-13** — More style changes (Mari): Crop label beside its icon (secondary colour); Reset style full width; slider labels secondary, numbers dimmer (tertiary) above the bar, label-to-bar gap 12 pt; ruler times dimmer; Background choices now Gradient, Wallpaper, Color, Image, and **new projects start on the blue Ocean gradient** (`Settings.defaultBackgroundKind`, `defaultGradient`). One check ("edited export shows the right moments") started failing with the gradient default (a frame-brightness tolerance), so that check now uses a plain background; all checks pass. Not committed.
 

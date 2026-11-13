@@ -320,7 +320,7 @@ private struct ClipBar: View {
         GeometryReader { geo in
             RoundedRectangle(cornerRadius: Theme.radius)
                 .fill(selected ? Theme.clipBarSelected : Theme.clipBar)
-                .innerShadow(radius: Theme.radius, color: .black.opacity(0.25), y: 7, blur: 20)
+                .innerShadow(radius: Theme.radius, color: Theme.barInnerShadow, y: 7, blur: 20)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.clipSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
                 .overlay(alignment: .leading) {
                     if geo.size.width > 56 {
@@ -349,14 +349,14 @@ private struct ZoomBar: View {
             let percent = "\(Int((scale * 100).rounded()))%"
             RoundedRectangle(cornerRadius: Theme.radius)
                 .fill(Theme.zoomBar)
-                .innerShadow(radius: Theme.radius, color: .black.opacity(0.25), y: 7, blur: 20)
+                .innerShadow(radius: Theme.radius, color: Theme.barInnerShadow, y: 7, blur: 20)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.zoomSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
                 .overlay(alignment: .leading) {
                     let inset = Theme.barLabelInset + (selected ? 1 : 0)
                     if geo.size.width > inset + 34 {
                         Text(percent)
                             .font(Theme.fontBody)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.clipLabel)
                             .lineLimit(1)
                             .padding(.leading, inset)
                     }
@@ -369,7 +369,7 @@ private struct ZoomBar: View {
 
     /// Small bars at each end of the selected zoom, hinting that the ends can be dragged.
     private var grip: some View {
-        RoundedRectangle(cornerRadius: 1).fill(.white).frame(width: 2, height: 14).padding(.horizontal, 7)
+        RoundedRectangle(cornerRadius: 1).fill(Theme.clipLabel).frame(width: 2, height: 14).padding(.horizontal, 7)
     }
 }
 

@@ -5,7 +5,7 @@ import SwiftUI
 struct VideoEditorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = EditorModel.shared
-    @AppStorage(Theme.lightModeKey) private var lightMode = false
+    @AppStorage(Theme.appearanceKey) private var appearance = Theme.AppearanceMode.system.rawValue
 
     init() { Theme.registerFonts() }
 
@@ -15,7 +15,8 @@ struct VideoEditorApp: App {
                 .environmentObject(model)
                 .environmentObject(model.playback)
                 .frame(minWidth: 720, minHeight: 480)
-                .preferredColorScheme(lightMode ? .light : .dark)
+                .onAppear { Theme.AppearanceMode.apply(appearance) }
+                .onChange(of: appearance) { Theme.AppearanceMode.apply(appearance) }
                 .font(Theme.fontBody)
                 .tint(Theme.accent)
         }

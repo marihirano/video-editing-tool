@@ -5,6 +5,7 @@ import SwiftUI
 struct AppMenus: Commands {
     @ObservedObject var model: EditorModel
     @AppStorage("showInspector") private var showInspector = true
+    @AppStorage(Theme.appearanceKey) private var appearance = Theme.AppearanceMode.system.rawValue
 
     private var noProject: Bool { model.project == nil }
 
@@ -64,6 +65,12 @@ struct AppMenus: Commands {
             }
                 .keyboardShortcut("s", modifiers: [.command, .option])
                 .disabled(noProject)
+            Menu("Appearance") {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(Theme.AppearanceMode.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.inline)
+            }
         }
         CommandMenu("Playback") {
             // Space plays and pauses (handled by the play button, so typing a space in a text field still works).

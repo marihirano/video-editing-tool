@@ -8,7 +8,6 @@ struct ContentView: View {
     @EnvironmentObject private var model: EditorModel
     @State private var isDropTargeted = false
     @AppStorage("showInspector") private var showInspector = true
-    @AppStorage(Theme.lightModeKey) private var lightMode = false
 
     var body: some View {
         let panelShown = model.project != nil && showInspector
@@ -74,13 +73,6 @@ extension ContentView {
     @ToolbarContentBuilder var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             Text(model.displayName).font(Theme.fontBody).foregroundStyle(Theme.secondaryText)
-        }
-        .withoutGlass()
-        ToolbarItem(placement: .primaryAction) {
-            Button { lightMode.toggle() } label: {
-                Label(lightMode ? "Dark Mode" : "Light Mode", systemImage: lightMode ? "moon" : "sun.max").font(.system(size: 13, weight: .light))
-            }
-            .help(lightMode ? "Switch to dark mode" : "Switch to light mode")
         }
         .withoutGlass()
         ToolbarItem(placement: .primaryAction) {

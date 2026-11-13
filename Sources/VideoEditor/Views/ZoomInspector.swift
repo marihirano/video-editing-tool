@@ -137,7 +137,7 @@ private struct EasingCurve: View {
                 Path { p in
                     p.move(to: CGPoint(x: 0, y: top)); p.addLine(to: CGPoint(x: w, y: top))
                 }
-                .stroke(Color.white.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                .stroke(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 Path { p in
                     for i in 0...80 {
                         let x = Double(i) / 80
@@ -148,6 +148,6 @@ private struct EasingCurve: View {
                 .stroke(Theme.zoom, lineWidth: 2)
             }
         }
-        .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Color.white.opacity(0.04)))
+        .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Theme.controlFill))
     }
 }

@@ -60,15 +60,29 @@ The whole pipeline, end to end, as plainly as possible.
 
 **Try it:** use it for a real video you'd post.
 
+## Between the MVP and phase 2
+
+### Light mode (built 2026-11-13, waiting for Mari's review)
+- Light colours for every part of the interface; the video and its preview don't change
+- Appearance setting: System (default), Light or Dark, in View › Appearance
+
+**Try it:** switch modes in the View menu, and change the Mac's own appearance with System selected.
+
+### Video shape
+- Export 16:9, 1:1 and 9:16 from one recording (the output size is already a setting, so this is mostly layout and preview work)
+
+**Try it:** pick each shape and check the framing, zooms and crop still look right.
+
 ## Phase 2: record in the app
 
 Before starting: install Xcode (free, from the App Store).
 
 - **P1. Capture:** record a display, window or area; countdown; global shortcut; pause and resume; hide desktop icons; save the cursor and click log into the project's cursor slot
 - **P2. Cursor:** draw the cursor from the log: smoothing, size, style, sharp cursor images, motion blur, click effects, idle hide
-- **P3. Auto-zoom:** create zoom segments from clicks and typing, then let Mari edit them on the zoom track from M4
-- **P4. Tuning:** rounds on real recordings until auto-zoom and the cursor feel right
+- **P3. Tuning:** rounds on real recordings until capture and the cursor feel right
+
+Auto-zoom is dropped (Never, 2026-11-13). Cursor data is still recorded, because the cursor features need it.
 
 ## Next step
 
-The MVP (M1–M5) is done and signed off (2026-11-12). Next: install Xcode, then P1 (capture).
+The MVP (M1–M5) is done and signed off (2026-11-12). Next: light mode (built, waiting for Mari's review), then video shape, then P1 (capture; Xcode must be installed and its licence accepted first).

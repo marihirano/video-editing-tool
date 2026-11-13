@@ -39,7 +39,7 @@ enum Theme {
     static let radiusPanel: CGFloat = 8      // the floating side panel
 
     // Layout.
-    static let panelWidth: CGFloat = 300
+    static let panelWidth: CGFloat = 306
     static let panelPadding: CGFloat = 20    // inside the side panel
     static let windowMargin: CGFloat = 24    // left and right of the preview and panel
     static let panelGap: CGFloat = 32        // between the preview and the side panel
@@ -320,7 +320,6 @@ struct ChoiceButtons<Value: Hashable>: View {
                 ChoiceButton(label: label(c), selected: isSelected(c)) { pick(c) }
             }
         }
-        .padding(2)
     }
 }
 
@@ -353,7 +352,7 @@ struct ChoiceButton: View {
 private struct ProportionalRow: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let ideal = subviews.map { $0.sizeThatFits(.unspecified) }
-        let gaps = Theme.s2 * CGFloat(max(subviews.count - 1, 0))
+        let gaps = Theme.s1 * CGFloat(max(subviews.count - 1, 0))
         let width = proposal.width ?? (ideal.reduce(0) { $0 + $1.width } + gaps)
         return CGSize(width: width, height: ideal.map(\.height).max() ?? 0)
     }
@@ -361,13 +360,13 @@ private struct ProportionalRow: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let ideal = subviews.map { $0.sizeThatFits(.unspecified).width }
         let sum = max(ideal.reduce(0, +), 1)
-        let gaps = Theme.s2 * CGFloat(max(subviews.count - 1, 0))
+        let gaps = Theme.s1 * CGFloat(max(subviews.count - 1, 0))
         let spare = bounds.width - gaps - sum   // negative: too tight, so every choice gives up the same amount of padding
         var x = bounds.minX
         for (i, v) in subviews.enumerated() {
             let w = spare >= 0 ? (bounds.width - gaps) * ideal[i] / sum : ideal[i] + spare / CGFloat(max(subviews.count, 1))
             v.place(at: CGPoint(x: x, y: bounds.minY), proposal: ProposedViewSize(width: w, height: bounds.height))
-            x += w + Theme.s2
+            x += w + Theme.s1
         }
     }
 }

@@ -76,18 +76,18 @@ extension ContentView {
         }
         .withoutGlass()
         ToolbarItem(placement: .primaryAction) {
-            Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward").fontWeight(.light) }
+            Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward").font(.system(size: 12, weight: .light)) }
                 .help("Undo (⌘Z)").disabled(!model.canUndo)
         }
         .withoutGlass()
         ToolbarItem(placement: .primaryAction) {
-            Button { model.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward").fontWeight(.light) }
+            Button { model.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward").font(.system(size: 12, weight: .light)) }
                 .help("Redo (⇧⌘Z)").disabled(!model.canRedo)
         }
         .withoutGlass()
         ToolbarItem(placement: .primaryAction) {
             Button { withAnimation(.easeInOut(duration: 0.2)) { showInspector.toggle() } } label: {
-                Label("Side Panel", systemImage: "sidebar.right").fontWeight(.light)
+                Label("Side Panel", systemImage: "sidebar.right").font(.system(size: 13, weight: .light))
             }
             .help(showInspector ? "Hide the style panel" : "Show the style panel")
             .disabled(model.project == nil)

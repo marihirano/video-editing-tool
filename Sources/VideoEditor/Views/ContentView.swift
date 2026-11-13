@@ -95,12 +95,12 @@ struct PreviewArea: View {
                 PreviewView(drawer: drawer)
                     .overlay(PreviewOverlay())
                     .aspectRatio(CGFloat(output.width) / CGFloat(output.height), contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSmall))
             } else {
-                Text("Preview unavailable").foregroundStyle(.secondary)
+                Text("Preview unavailable").foregroundStyle(Theme.secondaryText)
             }
         }
-        .padding(24)
+        .padding(Theme.panelPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

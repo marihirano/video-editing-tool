@@ -8,7 +8,7 @@ struct ExportSheet: View {
     @EnvironmentObject private var model: EditorModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Theme.s4) {
             switch model.export {
             case .choosing:
                 ExportOptions()
@@ -16,27 +16,27 @@ struct ExportSheet: View {
                 Text("Exporting…").font(.headline)
                 ProgressView(value: progress)
                 Text("\(Int(progress * 100))%  ·  \(model.exportSummary)")
-                    .foregroundStyle(.secondary).font(.callout)
-                HStack { Spacer(); Button("Cancel") { model.cancelExport() }.keyboardShortcut(.cancelAction) }
+                    .foregroundStyle(Theme.secondaryText).font(.callout)
+                HStack { Spacer(); Button("Cancel") { model.cancelExport() }.buttonStyle(QuietButtonStyle()).keyboardShortcut(.cancelAction) }
             case .finished(let url):
                 Label("Export finished", systemImage: "checkmark.circle.fill")
                     .font(.headline).foregroundStyle(.green)
-                Text(url.lastPathComponent).foregroundStyle(.secondary)
+                Text(url.lastPathComponent).foregroundStyle(Theme.secondaryText)
                 HStack {
                     Spacer()
-                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-                    Button("Done") { model.dismissExport() }.keyboardShortcut(.defaultAction)
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }.buttonStyle(QuietButtonStyle())
+                    Button("Done") { model.dismissExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large)
                 }
             case .failed(let message):
                 Label("Export failed", systemImage: "exclamationmark.triangle.fill")
                     .font(.headline).foregroundStyle(.orange)
-                Text(message).foregroundStyle(.secondary)
-                HStack { Spacer(); Button("OK") { model.dismissExport() }.keyboardShortcut(.defaultAction) }
+                Text(message).foregroundStyle(Theme.secondaryText)
+                HStack { Spacer(); Button("OK") { model.dismissExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large) }
             case nil:
                 EmptyView()
             }
         }
-        .padding(24)
+        .padding(Theme.s5)
         .frame(width: 380)
     }
 }
@@ -50,12 +50,9 @@ private struct ExportOptions: View {
     private var isGIF: Bool { output.format == .gif }
 
     var body: some View {
-        Text("Export").font(.headline)
-        Picker("Format", selection: Binding(get: { output.format }, set: { f in model.setOutput { $0.format = f } })) {
-            Text("MP4 video").tag(OutputSettings.Format.mp4)
-            Text("GIF").tag(OutputSettings.Format.gif)
-        }
-        .pickerStyle(.segmented).labelsHidden()
+        Text("Export").font(.title3.weight(.semibold))
+        ChoiceButtons(choices: [OutputSettings.Format.mp4, .gif], isSelected: { output.format == $0 },
+                      label: { $0 == .mp4 ? "MP4 video" : "GIF" }) { f in model.setOutput { $0.format = f } }
 
         if isGIF {
             row("Size", Settings.gifHeights, selected: output.gifHeight, label: { "\($0)p" }) { h in model.setOutput { $0.gifHeight = h } }
@@ -67,16 +64,16 @@ private struct ExportOptions: View {
 
         VStack(alignment: .leading, spacing: 2) {
             Text(model.exportSummary).font(.callout)
-            Text(sizeText).font(.callout).foregroundStyle(.secondary)
+            Text(sizeText).font(.callout).foregroundStyle(Theme.secondaryText)
             if isGIF { Text("GIFs get big quickly. For long clips, a smaller size or lower frame rate helps.")
-                .font(.caption).foregroundStyle(.secondary).padding(.top, 2) }
+                .font(.caption).foregroundStyle(Theme.secondaryText).padding(.top, 2) }
         }
         .task(id: EstimateKey(project: model.project, isGIF: isGIF)) { await estimate() }
 
         HStack {
             Spacer()
-            Button("Cancel") { model.dismissExport() }.keyboardShortcut(.cancelAction)
-            Button("Export…") { model.confirmExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+            Button("Cancel") { model.dismissExport() }.buttonStyle(QuietButtonStyle()).keyboardShortcut(.cancelAction)
+            Button("Export…") { model.confirmExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large)
         }
     }
 
@@ -84,11 +81,8 @@ private struct ExportOptions: View {
 
     private func row(_ title: String, _ values: [Int], selected: Int, label: @escaping (Int) -> String, set: @escaping (Int) -> Void) -> some View {
         HStack {
-            Text(title).frame(width: 80, alignment: .leading)
-            Picker(title, selection: Binding(get: { selected }, set: set)) {
-                ForEach(values, id: \.self) { Text(label($0)).tag($0) }
-            }
-            .pickerStyle(.segmented).labelsHidden()
+            Text(title).font(.callout).frame(width: 84, alignment: .leading)
+            ChoiceButtons(choices: values, isSelected: { $0 == selected }, label: label, pick: set)
         }
     }
 

@@ -7,7 +7,7 @@ struct TransportBar: View {
     @EnvironmentObject private var playback: PlaybackController
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: Theme.s3) {
             Button { playback.togglePlay() } label: {
                 Image(systemName: playback.isPlaying ? "pause.circle" : "play.circle")
                     .font(.system(size: 22, weight: .light))
@@ -17,25 +17,17 @@ struct TransportBar: View {
             .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
 
             (Text(Self.format(playback.outputTime)).foregroundStyle(.primary)
-             + Text(" / \(Self.format(playback.outputDuration))").foregroundStyle(.secondary))
-                .font(.system(size: 15).monospacedDigit())
+             + Text(" / \(Self.format(playback.outputDuration))").foregroundStyle(Theme.secondaryText))
+                .font(.system(size: 14).monospacedDigit())
 
-            Button { model.toggleCutMode() } label: {
-                Image(systemName: "scissors").font(.system(size: 17))
-                    .foregroundStyle(model.isCutMode ? Color.white : Color.primary)
-                    .frame(width: 30, height: 26)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(model.isCutMode ? Color.accentColor : .clear))
+            ToolButton(systemImage: "scissors", isOn: model.isCutMode,
+                       help: model.isCutMode ? "Click the timeline to cut; click the scissors again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut") {
+                model.toggleCutMode()
             }
-            .buttonStyle(.plain)
-            .help(model.isCutMode ? "Click the timeline to cut; click the scissors again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut")
-            Button { model.toggleCropMode() } label: {
-                Image(systemName: "crop").font(.system(size: 16))
-                    .foregroundStyle(model.isCropMode ? Color.white : Color.primary)
-                    .frame(width: 30, height: 26)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(model.isCropMode ? Color.accentColor : .clear))
+            ToolButton(systemImage: "crop", isOn: model.isCropMode,
+                       help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
+                model.toggleCropMode()
             }
-            .buttonStyle(.plain)
-            .help(model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording")
             Spacer()
         }
     }

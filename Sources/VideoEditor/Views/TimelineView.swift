@@ -29,20 +29,20 @@ struct TimelineView: View {
     }
 
     private let trackH = Settings.timelineTrackHeight
-    private let trackGap: CGFloat = 8
+    private let trackGap: CGFloat = Theme.s2
     private let knob: CGFloat = 9
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.s3) {
             TransportBar()
             GeometryReader { geo in
                 tracks(width: max(geo.size.width, 1))
             }
             .frame(height: knob + trackH * 2 + trackGap)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 16)
+        .padding(.horizontal, Theme.panelPadding)
+        .padding(.top, Theme.s3)
+        .padding(.bottom, Theme.s4)
         .onAppear {
             // For Claude's debug snapshot: VET_SNAPSHOT_PLACEHOLDER=1 shows the "+" placeholder at 70%.
             guard ProcessInfo.processInfo.environment["VET_SNAPSHOT_PLACEHOLDER"] != nil else { return }
@@ -94,11 +94,11 @@ struct TimelineView: View {
                     .offset(x: left, y: clipTop)
             }
             // Zoom track.
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: Theme.radius)
                 .fill(Color(rgba: Settings.timelineZoomTrackColor))
                 .overlay {
                     if zooms.isEmpty && ghost == nil && placeholder == nil {
-                        Text("Drag here to add a zoom").font(.callout).foregroundStyle(.white.opacity(0.35))
+                        Text("Drag here to add a zoom").font(.callout).foregroundStyle(Theme.tertiaryText)
                     }
                 }
                 .frame(width: w, height: trackH)
@@ -247,9 +247,9 @@ private struct ClipBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color(rgba: Settings.timelineClipColor))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.white, lineWidth: selected ? 2 : 0))
+            RoundedRectangle(cornerRadius: Theme.radius)
+                .fill(Theme.clip)
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Color.white, lineWidth: selected ? 2 : 0))
                 .overlay {
                     if geo.size.width > 56 {
                         Text("\(TimelineView.lengthLabel(clip.outputDuration)) \(TimelineView.speedLabel(clip.rate))")
@@ -271,9 +271,9 @@ private struct ZoomBar: View {
     var body: some View {
         GeometryReader { geo in
             let percent = "\(Int((scale * 100).rounded()))%"
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color(rgba: Settings.timelineZoomColor))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.white, lineWidth: selected ? 2 : 0))
+            RoundedRectangle(cornerRadius: Theme.radius)
+                .fill(Theme.zoom)
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Color.white, lineWidth: selected ? 2 : 0))
                 .overlay {
                     if geo.size.width > 40 {
                         Text(geo.size.width > 96 ? "\(percent) zoom" : percent)
@@ -297,10 +297,10 @@ private struct ZoomBar: View {
 /// Where a click would add a zoom: a dashed purple outline with a "+" in the middle.
 private struct ZoomPlaceholder: View {
     var body: some View {
-        let color = Color(rgba: Settings.timelineZoomColor)
-        RoundedRectangle(cornerRadius: 6)
+        let color = Theme.zoom
+        RoundedRectangle(cornerRadius: Theme.radius)
             .fill(color.opacity(0.22))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
             .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white.opacity(0.9)))
             .allowsHitTesting(false)
     }

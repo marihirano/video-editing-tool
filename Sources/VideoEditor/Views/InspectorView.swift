@@ -8,39 +8,35 @@ struct InspectorView: View {
     private var style: FrameStyle { model.project?.style ?? FrameStyle() }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                section("Background") { backgroundControls }
-                section("Frame") {
-                    slider("Padding", value: \.padding, range: Settings.paddingRange, unit: "%")
-                    slider("Corners", value: \.cornerRadius, range: Settings.cornerRadiusRange, unit: "")
-                }
-                section("Shadow") {
-                    slider("Opacity", value: \.shadowOpacity, range: Settings.shadowOpacityRange, unit: "", scale: 100, suffix: "%")
-                    slider("Blur", value: \.shadowBlur, range: Settings.shadowBlurRange, unit: "")
-                    slider("Distance", value: \.shadowOffset, range: Settings.shadowOffsetRange, unit: "")
-                }
-                Button("Reset style") { model.updateStyle { $0 = FrameStyle() } }
-                    .controlSize(.small)
+        PanelScaffold {
+            PanelSection("Background") { backgroundControls }
+            PanelSection("Frame") {
+                slider("Padding", value: \.padding, range: Settings.paddingRange, unit: "%")
+                slider("Corners", value: \.cornerRadius, range: Settings.cornerRadiusRange, unit: "")
             }
-            .padding(16)
-            .frame(width: 300, alignment: .leading)
+            PanelSection("Shadow") {
+                slider("Opacity", value: \.shadowOpacity, range: Settings.shadowOpacityRange, unit: "", scale: 100, suffix: "%")
+                slider("Blur", value: \.shadowBlur, range: Settings.shadowBlurRange, unit: "")
+                slider("Distance", value: \.shadowOffset, range: Settings.shadowOffsetRange, unit: "")
+            }
+            Button("Reset style") { model.updateStyle { $0 = FrameStyle() } }
+                .buttonStyle(QuietButtonStyle())
         }
-        .frame(width: 300)
-        .background(.bar)
     }
 
     // MARK: Background
 
     @ViewBuilder private var backgroundControls: some View {
-        Picker("", selection: Binding(get: { style.kind }, set: { k in model.updateStyle { $0.kind = k } })) {
-            Text("Wallpaper").tag(BackgroundKind.wallpaper)
-            Text("Gradient").tag(BackgroundKind.gradient)
-            Text("Color").tag(BackgroundKind.solid)
-            Text("Image").tag(BackgroundKind.image)
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
+        ChoiceButtons(choices: [BackgroundKind.wallpaper, .gradient, .solid, .image],
+                      isSelected: { style.kind == $0 },
+                      label: { k in
+                          switch k {
+                          case .wallpaper: "Wallpaper"
+                          case .gradient: "Gradient"
+                          case .solid: "Color"
+                          case .image: "Image"
+                          }
+                      }) { k in model.updateStyle { $0.kind = k } }
 
         switch style.kind {
         case .wallpaper:
@@ -76,23 +72,24 @@ struct InspectorView: View {
                     model.updateStyle { $0.imagePath = url.path }
                 }
             }
+            .buttonStyle(QuietButtonStyle())
             if let path = style.imagePath {
                 Text(URL(fileURLWithPath: path).lastPathComponent)
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    .font(.caption).foregroundStyle(Theme.secondaryText).lineLimit(1).truncationMode(.middle)
             }
         }
     }
 
     private func swatchGrid<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8, content: content)
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s2), count: 3), spacing: Theme.s2, content: content)
     }
 
     private func swatch(selected: Bool, name: String, fill: AnyShapeStyle, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: Theme.radius)
                 .fill(fill)
                 .frame(height: 38)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? Color.accentColor : .white.opacity(0.12), lineWidth: selected ? 2.5 : 1))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(selected ? Theme.accent : Theme.hairline, lineWidth: selected ? 2 : 1))
         }
         .buttonStyle(.plain)
         .help(name)
@@ -100,26 +97,11 @@ struct InspectorView: View {
 
     // MARK: Helpers
 
-    private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.headline)
-            content()
-        }
-    }
-
     private func slider(_ title: String, value: WritableKeyPath<FrameStyle, Double>, range: ClosedRange<Double>,
                         unit: String, scale: Double = 1, suffix: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text("\(Int((style[keyPath: value] * scale).rounded()))\(suffix ?? unit)")
-                    .foregroundStyle(.secondary).monospacedDigit()
-            }
-            .font(.callout)
-            Slider(value: Binding(get: { style[keyPath: value] }, set: { v in model.updateStyle { $0[keyPath: value] = v } }), in: range)
-                .controlSize(.small)
-        }
+        SliderRow(title: title, valueText: "\(Int((style[keyPath: value] * scale).rounded()))\(suffix ?? unit)",
+                  value: Binding(get: { style[keyPath: value] }, set: { v in model.updateStyle { $0[keyPath: value] = v } }),
+                  range: range)
     }
 
     private func colorBinding(_ path: WritableKeyPath<FrameStyle, RGBAColor>) -> Binding<Color> {

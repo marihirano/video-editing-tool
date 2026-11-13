@@ -11,68 +11,37 @@ struct ClipInspector: View {
     var body: some View {
         let clips = model.clips
         let clip = clips.indices.contains(index) ? clips[index] : Clip(start: 0, end: 0)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                Button { model.selectedClip = nil } label: {
-                    Label("Style", systemImage: "chevron.left").font(.callout.weight(.medium))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
-                .help("Back to background and frame settings")
+        PanelScaffold {
+            PanelHeader(back: { model.selectedClip = nil }, title: "Clip \(index + 1) of \(clips.count)",
+                        detail: "\(TimelineView.lengthLabel(clip.outputDuration)) in the video · recording \(Self.time(clip.start))–\(Self.time(clip.end))")
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Clip \(index + 1) of \(clips.count)").font(.title3.weight(.semibold))
-                    Text("\(TimelineView.lengthLabel(clip.outputDuration)) in the video · recording \(Self.time(clip.start))–\(Self.time(clip.end))")
-                        .font(.callout).foregroundStyle(.secondary)
+            PanelSection("Speed") {
+                ChoiceButtons(choices: [1.0] + Settings.speedPresets, isSelected: { abs(clip.rate - $0) < 0.001 },
+                              label: { TimelineView.speedLabel($0) }) { model.setSpeed($0, ofClip: index) }
+                HStack(spacing: Theme.s2) {
+                    Text("Custom").font(.callout)
+                    Spacer()
+                    TextField("", text: $customText)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                        .onSubmit { applyCustom() }
+                    Text("×").font(.callout)
+                    Button("Apply") { applyCustom() }.buttonStyle(QuietButtonStyle())
                 }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Speed").font(.headline)
-                    HStack(spacing: 6) {
-                        ForEach([1.0] + Settings.speedPresets, id: \.self) { r in
-                            speedButton(r, selected: abs(clip.rate - r) < 0.001)
-                        }
-                    }
-                    HStack(spacing: 6) {
-                        Text("Custom").font(.callout)
-                        Spacer()
-                        TextField("", text: $customText)
-                            .textFieldStyle(.roundedBorder)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 60)
-                            .onSubmit { applyCustom() }
-                        Text("×").font(.callout)
-                        Button("Apply") { applyCustom() }.controlSize(.small)
-                    }
-                    Text("From \(TimelineView.speedLabel(Settings.customSpeedRange.lowerBound)) to \(TimelineView.speedLabel(Settings.customSpeedRange.upperBound)).")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                Button(role: .destructive) { model.deleteClip(index) } label: {
-                    Label("Delete clip", systemImage: "trash")
-                }
-                .disabled(clips.count < 2)
-                .help(clips.count < 2 ? "The video needs at least one clip" : "Remove this clip from the video (Delete)")
+                PanelNote("From \(TimelineView.speedLabel(Settings.customSpeedRange.lowerBound)) to \(TimelineView.speedLabel(Settings.customSpeedRange.upperBound)).")
             }
-            .padding(16)
-            .frame(width: 300, alignment: .leading)
+
+            Button(role: .destructive) { model.deleteClip(index) } label: {
+                Label("Delete clip", systemImage: "trash")
+            }
+            .buttonStyle(QuietButtonStyle(destructive: true))
+            .disabled(clips.count < 2)
+            .help(clips.count < 2 ? "The video needs at least one clip" : "Remove this clip from the video (Delete)")
         }
-        .frame(width: 300)
-        .background(.bar)
         .onAppear { customText = Self.number(clip.rate) }
         .onChange(of: clip.rate) { customText = Self.number(clip.rate) }
         .onChange(of: index) { customText = Self.number(clip.rate) }
-    }
-
-    private func speedButton(_ r: Double, selected: Bool) -> some View {
-        Button { model.setSpeed(r, ofClip: index) } label: {
-            Text(TimelineView.speedLabel(r))
-                .font(.callout.weight(.medium))
-                .frame(maxWidth: .infinity, minHeight: 28)
-                .foregroundStyle(selected ? Color.white : Color.primary)
-                .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.accentColor : Color.white.opacity(0.08)))
-        }
-        .buttonStyle(.plain)
     }
 
     private func applyCustom() {

@@ -30,7 +30,7 @@ struct ShapeMenu: View {
             .padding(.horizontal, Theme.s3)
             .frame(minHeight: 28)
             .background(RoundedRectangle(cornerRadius: Theme.radius)
-                .fill(hovering ? Theme.controlHover : Theme.controlFill))
+                .fill(hovering ? Theme.controlFill : Color.clear))   // no fill until hovered (and while its menu is open)
             .contentShape(Rectangle())
         }
         .menuStyle(.button)

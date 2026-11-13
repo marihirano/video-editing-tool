@@ -14,6 +14,10 @@ struct TransportBar: View {
                            help: model.isCutMode ? "Click the timeline to cut; click Cut again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut") {
                     model.toggleCutMode()
                 }
+                ToolButton(title: "Crop", systemImage: "crop", isOn: model.isCropMode,
+                           help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
+                    model.toggleCropMode()
+                }
                 ToolButton(title: "Zoom", systemImage: "plus.magnifyingglass",
                            help: "Add a zoom at the blue line (⌥⌘Z)") {
                     model.addZoomAtEditPoint()

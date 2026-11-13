@@ -75,6 +75,9 @@ extension ContentView {
             Text(model.displayName).font(Theme.fontBody).foregroundStyle(Theme.secondaryText)
         }
         .withoutGlass()
+        // Built with the macOS 26+ SDK (Xcode), the toolbar packs the buttons right beside the title
+        // unless a flexible space pushes them to the right edge.
+        if #available(macOS 26, *) { ToolbarSpacer(.flexible, placement: .primaryAction) }
         ToolbarItem(placement: .primaryAction) {
             Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward").font(.system(size: 12, weight: .light)) }
                 .help("Undo (⌘Z)").disabled(!model.canUndo)
@@ -125,13 +128,7 @@ struct PreviewArea: View {
             // A tall (9:16) or square preview is narrow, so the tools / play / time row keeps a minimum width.
             let rowW = min(geo.size.width, max(w, Theme.transportMinWidth))
             VStack(spacing: 0) {
-                HStack(spacing: Theme.s3) {
-                    ShapeMenu()
-                    ToolButton(title: "Crop", systemImage: "crop", isOn: model.isCropMode, showsTitle: true,
-                               help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
-                        model.toggleCropMode()
-                    }
-                }
+                ShapeMenu()
                 .frame(width: max(w, Theme.transportMinWidth), height: Theme.cropRowHeight)
                 Group {
                     if let drawer = model.drawer {

@@ -282,7 +282,7 @@ struct TimelineView: View {
     /// The blue line: 1 pt, no knob, with a small label of its time (tenths) at its top, kept inside the timeline.
     private func editLine(at px: CGFloat, time: Double, width w: CGFloat) -> some View {
         let text = TransportBar.tenths(time)
-        let labelH: CGFloat = 21, labelTop: CGFloat = 2
+        let labelH: CGFloat = 21, labelTop: CGFloat = -4   // centred on the ruler's time labels (they sit about 7 pt down)
         // Width of the label: digits are about 7.15 pt in 11 pt Inter (even-width digits), ":" and "." about 3 pt, plus 6 pt padding each side.
         let digits = text.filter(\.isNumber).count
         let labelW = CGFloat(digits) * 7.15 + CGFloat(text.count - digits) * 3.0 + 12

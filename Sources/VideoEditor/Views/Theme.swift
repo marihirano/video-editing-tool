@@ -52,36 +52,56 @@ enum Theme {
     static let playButtonSize: CGFloat = 32
     static let barLabelInset: CGFloat = 16   // clip and zoom labels from the bar's left edge
 
-    // Colours.
+    // Colours. Each one that differs between dark and light mode is built with `adaptive` and follows the window's appearance
+    // (the top-bar switch sets it, see `Theme.lightModeKey`).
+    /// UserDefaults / @AppStorage key for the light-mode switch.
+    static let lightModeKey = "lightMode"
+    static func adaptive(dark: RGBAColor, light: RGBAColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let c = isDark ? dark : light
+            return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: c.a)
+        })
+    }
+    /// The window behind everything (and the top bar).
+    static let windowBackground = adaptive(dark: Settings.previewSurround, light: RGBAColor(hex: 0xF2F2F4))
     /// The accent blue. To go back to the system's accent colour, make this `Color.accentColor`.
     static let accent = Color(rgba: Settings.accentColor)
     /// Text links (the "‹ Style" back link): a lighter blue that reads well on the dark panel.
-    static let link = Color(rgba: RGBAColor(hex: 0x6CB0FF))
+    static let link = adaptive(dark: RGBAColor(hex: 0x6CB0FF), light: RGBAColor(hex: 0x007683))
     /// The floating side panel: only a touch lighter than the window, so it reads as a quiet card.
-    static let panelFill = Color(rgba: RGBAColor(hex: 0x262628))
+    static let panelFill = adaptive(dark: RGBAColor(hex: 0x262628), light: RGBAColor(hex: 0xFFFFFF))
     /// The side panel's own thin scroll bar: width, gap from the panel's edges, colour.
     static let scrollThumbWidth: CGFloat = 6
     static let scrollThumbInset: CGFloat = 6
     static let scrollThumbMinHeight: CGFloat = 32
-    static let scrollThumb = Color.white.opacity(0.16)
-    static let playFill = Color(rgba: RGBAColor(hex: 0xF2F2F3))
+    static let scrollThumb = Color.primary.opacity(0.16)
+    static let playFill = adaptive(dark: RGBAColor(hex: 0xF2F2F3), light: RGBAColor(hex: 0x1D1D1F))
     /// The slider knob.
     static let sliderThumb = Color(rgba: RGBAColor(hex: 0x96BABE))
-    static let controlFill = Color.white.opacity(0.08)
-    static let controlHover = Color.white.opacity(0.14)
-    static let hairline = Color.white.opacity(0.12)
-    static let secondaryText = Color.white.opacity(0.62)   // a bit brighter than the system secondary, for dark panels
-    static let tertiaryText = Color.white.opacity(0.45)
+    static let controlFill = Color.primary.opacity(0.08)
+    static let controlHover = Color.primary.opacity(0.14)
+    static let hairline = Color.primary.opacity(0.12)
+    static let secondaryText = Color.primary.opacity(0.62)   // a bit brighter than the system secondary, for dark panels
+    static let tertiaryText = Color.primary.opacity(0.45)
     static let clip = Color(rgba: Settings.timelineClipColor)
     static let clipSelected = Color(rgba: Settings.timelineSelectedClipColor)
     static let zoomSelected = Color(rgba: Settings.timelineSelectedZoomColor)
     static let clipLabel = Color(rgba: Settings.timelineClipLabelColor)
-    static let editLine = Color(rgba: Settings.timelineEditLineColor)
+    static let editLine = adaptive(dark: Settings.timelineEditLineColor, light: RGBAColor(r: 0, g: 0, b: 0, a: 0.3))
+    static let editTag = adaptive(dark: Settings.timelineEditTagColor, light: RGBAColor(hex: 0xE4E4E7))
+    static let zoomTrack = adaptive(dark: Settings.timelineZoomTrackColor, light: RGBAColor(hex: 0xE3EFF1))
+    /// Bar fills: see-through in dark mode; stronger in light mode so the white labels stay readable.
+    static let clipBar = adaptive(dark: withAlpha(Settings.timelineClipColor, Settings.timelineClipOpacity), light: withAlpha(Settings.timelineClipColor, 0.9))
+    static let clipBarSelected = adaptive(dark: withAlpha(Settings.timelineSelectedClipColor, Settings.timelineClipOpacity), light: withAlpha(Settings.timelineSelectedClipColor, 0.9))
+    static let zoomBar = adaptive(dark: withAlpha(Settings.timelineZoomColor, Settings.timelineBarOpacity), light: withAlpha(Settings.timelineZoomColor, 0.9))
+    static let zoomPlus = adaptive(dark: RGBAColor(r: 1, g: 1, b: 1, a: 0.9), light: Settings.timelineZoomColor)
+    private static func withAlpha(_ c: RGBAColor, _ a: Double) -> RGBAColor { RGBAColor(r: c.r, g: c.g, b: c.b, a: a) }
     static let playhead = Color(rgba: Settings.timelinePlayheadColor)
     static let rulerText = tertiaryText   // dimmer than secondary text
-    static let rulerTick = Color.white.opacity(0.28)
-    static let rulerLine = Color.white.opacity(0.1)
-    static let trackIcon = Color.white.opacity(0.5)
+    static let rulerTick = Color.primary.opacity(0.28)
+    static let rulerLine = Color.primary.opacity(0.1)
+    static let trackIcon = Color.primary.opacity(0.5)
     static let zoom = Color(rgba: Settings.timelineZoomColor)
 }
 
@@ -271,7 +291,7 @@ struct NumberField: View {
         .font(Theme.fontCallout)
         .padding(.horizontal, Theme.s2)
         .frame(width: 60, height: 33)
-        .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Color(rgba: Settings.previewSurround)))
+        .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Theme.windowBackground))
         .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall).strokeBorder(Theme.hairline))
     }
 }

@@ -140,7 +140,7 @@ struct TimelineView: View {
             }
             // Zoom track.
             RoundedRectangle(cornerRadius: Theme.radius)
-                .fill(Color(rgba: Settings.timelineZoomTrackColor))
+                .fill(Theme.zoomTrack)
                 .overlay {
                     if zooms.isEmpty && ghost == nil && placeholder == nil {
                         Text("Click or drag to add a zoom").font(Theme.fontCallout).foregroundStyle(Theme.tertiaryText)
@@ -294,7 +294,7 @@ struct TimelineView: View {
             Text(text).font(Theme.fontSmall.monospacedDigit()).foregroundStyle(Theme.secondaryText)
                 .fixedSize()
                 .frame(width: labelW, height: labelH)
-                .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Color(rgba: Settings.timelineEditTagColor)))
+                .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Theme.editTag))
                 .offset(x: labelX, y: labelTop)
         }
         .allowsHitTesting(false)
@@ -319,7 +319,7 @@ private struct ClipBar: View {
     var body: some View {
         GeometryReader { geo in
             RoundedRectangle(cornerRadius: Theme.radius)
-                .fill((selected ? Theme.clipSelected : Theme.clip).opacity(Settings.timelineClipOpacity))
+                .fill(selected ? Theme.clipBarSelected : Theme.clipBar)
                 .innerShadow(radius: Theme.radius, color: .black.opacity(0.25), y: 7, blur: 20)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.clipSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
                 .overlay(alignment: .leading) {
@@ -348,7 +348,7 @@ private struct ZoomBar: View {
         GeometryReader { geo in
             let percent = "\(Int((scale * 100).rounded()))%"
             RoundedRectangle(cornerRadius: Theme.radius)
-                .fill(Theme.zoom.opacity(Settings.timelineBarOpacity))
+                .fill(Theme.zoomBar)
                 .innerShadow(radius: Theme.radius, color: .black.opacity(0.25), y: 7, blur: 20)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.zoomSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
                 .overlay(alignment: .leading) {
@@ -380,7 +380,7 @@ private struct ZoomPlaceholder: View {
         RoundedRectangle(cornerRadius: Theme.radius)
             .fill(color.opacity(0.22))
             .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
-            .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .light)).foregroundStyle(.white.opacity(0.9)))
+            .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .light)).foregroundStyle(Theme.zoomPlus))
             .allowsHitTesting(false)
     }
 }

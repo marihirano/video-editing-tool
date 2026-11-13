@@ -20,7 +20,7 @@ This file is the shared memory for every Claude session on this project. Any age
 ## Current status
 
 - **Local folder:** `~/video-editing-tool` (the old name, on purpose, so past conversations stay visible in the Claude app). Everything else is named `video-editor`. Don't rename the folder.
-- **Phase:** M5 (export options and polish) built and pushed on 2026-11-12, **waiting for Mari to try it**; this finishes the MVP build. M4, M3 and M2 are also still waiting for feedback. M1 was approved on 2026-11-10. Next: feedback rounds, then phase 2 (install Xcode first).
+- **Phase:** **MVP done.** Mari signed off M1 (2026-11-10) and M2–M5 plus the polish pass (2026-11-12). **Next: phase 2 (record in the app), starting with P1. Mari installs Xcode first.**
 - Git repo on branch `main`, remote `origin` = https://github.com/marihirano/video-editor.git. Pushed to GitHub on 2026-11-10 (Mari approved). The `gh` tool isn't installed; use plain `git`.
 - **Build the app:** `scripts/build-app.sh` → `build/Video Editor.app` (release build, ad-hoc signed). **Run checks:** `swift run CoreChecks` (project save/reopen, shader compile, layout, a real 1080p hardware export of a generated test video). XCTest and Swift Testing don't run without Xcode, so checks are a plain program.
 - **Screenshots:** the terminal has no screen-recording permission and computer use was off. `VET_SNAPSHOT=/path.png` makes the app save its window, log whether the preview drew video frames (`/path.png.txt`), and quit; launch with `open -n --env VET_SNAPSHOT=… -a "build/Video Editor.app" video.mov`. The Metal preview itself is blank in that picture.
@@ -85,6 +85,8 @@ node ~/design-project-drive/sweep.mjs add --type <type> --url <url> --label "<sh
 
 Newest first. Each entry: date, decision, reason.
 
+- **2026-11-12** — **MVP signed off:** Mari tried M2–M5 and the polish pass and approved them, so the 'for Mari to review' defaults in those entries stand. *Why:* Mari's review.
+
 - **2026-11-12** — **Visual polish pass (Claude's calls, for Mari to review; no behaviour changed).** Spacing scale 4/8/12/16/24; side panels and timeline share a 20 px edge margin; corner radius 6 for controls (4 for stills, 12 for the empty-window drop area). All four side panels use the same header (back link, title, detail), section titles, slider rows and note text. One blue button per screen: the side panels' Reset/Done/Apply/Delete are quiet gray (Delete is red text); Export stays the only blue button on the main window, and Export… / Done are the blue ones inside the export window. Speed, easing, background-kind and the export Format/Size/Frame-rate choices are now equal-width buttons (the old native segmented control had unequal widths and a stray divider). Scissors/crop buttons and choices show a hover state. Secondary text is a little brighter for contrast on the dark window. *Why:* Mari asked for a calmer, consistent look.
 
 - **2026-11-12** — **Renamed everything to `video-editor`** (it was `video-editing-tool`): the app ("Video Editor", bundle id `com.marihirano.video-editor`, Swift target `VideoEditor`), the GitHub repo, Project Drive (the old name is kept as an alias, so old `#video-editing-tool` tags still match), the docs and the triage page. Project files keep the `.vetproj` extension, so saved projects still open. **The local folder stays `~/video-editing-tool`:** it was moved to `~/video-editor` briefly, but the Claude app hides past conversations whose folder is gone, so Mari had it moved back. *Why:* Mari's call. Use `video-editor` for any new repo, Figma file or deployment, and `#video-editor` in reflections.
@@ -126,6 +128,8 @@ Newest first. Each entry: date, decision, reason.
 ## Session log
 
 Newest first. One or two lines per session.
+
+- **2026-11-12** — Pushed the polish pass. Mari signed off M2–M5, so the MVP is done; next is phase 2 after Xcode is installed.
 
 - **2026-11-12** — Visual polish pass: new `Theme.swift` and shared panel pieces; all four side panels, transport bar, timeline margins, empty window and export window tidied. Before/after snapshots checked. Committed and pushed to `main` (Mari approved the push).
 

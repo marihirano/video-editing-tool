@@ -127,7 +127,7 @@ Newest first. Each entry: date, decision, reason.
 
 Newest first. One or two lines per session.
 
-- **2026-11-12** — Visual polish pass: new `Theme.swift` and shared panel pieces; all four side panels, transport bar, timeline margins, empty window and export window tidied. Before/after snapshots checked. Committed on `main`, **not pushed** (waiting for Mari to look).
+- **2026-11-12** — Visual polish pass: new `Theme.swift` and shared panel pieces; all four side panels, transport bar, timeline margins, empty window and export window tidied. Before/after snapshots checked. Committed and pushed to `main` (Mari approved the push).
 
 - **2026-11-12** — Renamed the project to `video-editor`: app, bundle id, Swift target, GitHub repo, Project Drive (alias kept), docs and triage page. Moved the folder to `~/video-editor`, then back to `~/video-editing-tool` because the Claude app hid (archived) the past conversations; unarchived them. Changed `#video-editing-tool` to `#video-editor` in the 11/10 and 11/12 daily reflections.
 

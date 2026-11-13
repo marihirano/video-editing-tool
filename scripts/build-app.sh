@@ -15,6 +15,8 @@ cp "$BIN" "$APP/Contents/MacOS/VideoEditor"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # App icon (redraw it with: swift scripts/make-icon.swift)
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# The interface font (Inter, with its licence)
+cp -R Resources/Fonts "$APP/Contents/Resources/Fonts"
 
 # Ad-hoc signature: enough to run on this Mac (no Apple developer account needed).
 codesign --force --sign - "$APP"

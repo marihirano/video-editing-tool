@@ -6,6 +6,8 @@ struct VideoEditorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = EditorModel.shared
 
+    init() { Theme.registerFonts() }
+
     var body: some Scene {
         Window("Video Editor", id: "editor") {
             ContentView()
@@ -13,6 +15,8 @@ struct VideoEditorApp: App {
                 .environmentObject(model.playback)
                 .frame(minWidth: 720, minHeight: 480)
                 .preferredColorScheme(.dark)
+                .font(Theme.fontBody)
+                .tint(Theme.accent)
         }
         .defaultSize(width: 1200, height: 780)
         .windowToolbarStyle(.unified(showsTitle: false))

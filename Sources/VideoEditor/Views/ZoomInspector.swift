@@ -13,19 +13,13 @@ struct ZoomInspector: View {
     }
 
     var body: some View {
-        let ranges = model.zoomRanges
-        let length = ranges.indices.contains(index) ? ranges[index].end - ranges[index].start : 0
         PanelScaffold {
-            PanelHeader(back: { model.selectedZoom = nil }, title: "Zoom \(index + 1) of \(model.zooms.count)",
-                        detail: "\(TimelineView.lengthLabel(length)) in the video")
+            PanelHeader(back: { model.selectedZoom = nil }, title: "Zoom \(index + 1) of \(model.zooms.count)")
 
-            PanelSection(title: "Amount") {
-                Text("\(Int((zoom.scale * 100).rounded()))%").font(.callout.monospacedDigit()).foregroundStyle(Theme.secondaryText)
-            } content: {
-                Slider(value: binding(\.scale, group: "scale"), in: Settings.zoomScaleRange)
-            }
+            SliderRow(title: "Amount", valueText: "\(Int((zoom.scale * 100).rounded()))%",
+                      value: binding(\.scale, group: "scale"), range: Settings.zoomScaleRange)
 
-            PanelSection(title: "Where it points") {
+            PanelSection(title: "Where it points", spacing: 18) {
                 Button("Center") { model.updateZoom(index, group: "point") { $0.centerX = 0.5; $0.centerY = 0.5 } }
                     .buttonStyle(QuietButtonStyle())
             } content: {
@@ -37,7 +31,7 @@ struct ZoomInspector: View {
                 PanelNote("Drag the circle to the spot to zoom in on.")
             }
 
-            PanelSection("Animation") {
+            PanelSection("Animation", spacing: 18) {
                 ChoiceButtons(choices: Array(Settings.zoomEasingPresets.indices),
                               isSelected: { i in
                                   let p = Settings.zoomEasingPresets[i]
@@ -55,9 +49,12 @@ struct ZoomInspector: View {
             }
 
             Button(role: .destructive) { model.deleteZoom(index) } label: {
-                Label("Delete zoom", systemImage: "trash")
+                HStack(spacing: Theme.s1 + 2) {
+                    Image(systemName: "trash").font(.system(size: 14, weight: .light))
+                    Text("Delete zoom")
+                }
             }
-            .buttonStyle(QuietButtonStyle(destructive: true))
+            .buttonStyle(QuietButtonStyle(fullWidth: true))   // white text and icon (Mari, 2026-11-13)
             .help("Remove this zoom (Delete)")
         }
         // A still of the recording at the middle of the zoom, cropped like the video.

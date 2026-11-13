@@ -15,7 +15,7 @@ struct ContentView: View {
             if model.project == nil {
                 EmptyStateView(isTargeted: isDropTargeted)
             } else {
-                HStack(alignment: .top, spacing: Theme.panelPadding) {
+                HStack(alignment: .top, spacing: Theme.panelGap) {
                     PreviewArea()
                     if panelShown {
                         Group {
@@ -30,7 +30,8 @@ struct ContentView: View {
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
-                .padding([.horizontal, .top], Theme.panelPadding)
+                .padding(.horizontal, Theme.windowMargin)
+                .padding(.top, Theme.s3)
                 TimelineView()
             }
         }
@@ -71,22 +72,22 @@ extension ContentView {
     /// No glass pills behind the title or the icon buttons; Export is a plain blue button with the app's usual corners.
     @ToolbarContentBuilder var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            Text(model.displayName).font(.headline)
+            Text(model.displayName).font(Theme.fontBody).foregroundStyle(Theme.secondaryText)
         }
         .withoutGlass()
         ToolbarItem(placement: .primaryAction) {
-            Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+            Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward").fontWeight(.light) }
                 .help("Undo (⌘Z)").disabled(!model.canUndo)
         }
         .withoutGlass()
         ToolbarItem(placement: .primaryAction) {
-            Button { model.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
+            Button { model.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward").fontWeight(.light) }
                 .help("Redo (⇧⌘Z)").disabled(!model.canRedo)
         }
         .withoutGlass()
         ToolbarItem(placement: .primaryAction) {
             Button { withAnimation(.easeInOut(duration: 0.2)) { showInspector.toggle() } } label: {
-                Label("Side Panel", systemImage: "sidebar.right")
+                Label("Side Panel", systemImage: "sidebar.right").fontWeight(.light)
             }
             .help(showInspector ? "Hide the style panel" : "Show the style panel")
             .disabled(model.project == nil)
@@ -96,7 +97,7 @@ extension ContentView {
             Button("Export") { model.startExport() }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(model.project == nil || model.export != nil)
-                .padding(.trailing, Theme.s1)   // keeps Export (and the buttons beside it) a little off the window's right edge
+                .padding(.trailing, Theme.s4)   // lines Export's right edge up with the side panel's right edge
         }
         .withoutGlass()
     }
@@ -118,9 +119,14 @@ struct PreviewArea: View {
         let output = model.project?.output ?? OutputSettings()
         let aspect = CGFloat(output.width) / CGFloat(output.height)
         GeometryReader { geo in
-            let spare = Theme.playButtonSize + Theme.s3
+            let spare = Theme.transportHeight + Theme.cropRowHeight
             let w = min(geo.size.width, max(geo.size.height - spare, 1) * aspect)
-            VStack(spacing: Theme.s3) {
+            VStack(spacing: 0) {
+                ToolButton(title: "Crop", systemImage: "crop", isOn: model.isCropMode, showsTitle: true,
+                           help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
+                    model.toggleCropMode()
+                }
+                .frame(width: w, height: Theme.cropRowHeight)
                 Group {
                     if let drawer = model.drawer {
                         PreviewView(drawer: drawer)

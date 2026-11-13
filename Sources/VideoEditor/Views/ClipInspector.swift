@@ -7,35 +7,55 @@ struct ClipInspector: View {
     @EnvironmentObject private var model: EditorModel
     let index: Int
     @State private var customText = ""
+    @FocusState private var customFocused: Bool
+
+    /// The speed choices: 1×, the presets, and "Custom" (lit when the speed is none of those).
+    private enum SpeedChoice: Hashable {
+        case preset(Double), custom
+        static var all: [SpeedChoice] { ([1.0] + Settings.speedPresets).map { .preset($0) } + [.custom] }
+        var label: String {
+            switch self {
+            case .preset(let r): return TimelineView.speedLabel(r)
+            case .custom: return "Custom"
+            }
+        }
+        func isSelected(rate: Double) -> Bool {
+            switch self {
+            case .preset(let r): return abs(rate - r) < 0.001
+            case .custom: return !([1.0] + Settings.speedPresets).contains { abs(rate - $0) < 0.001 }
+            }
+        }
+    }
 
     var body: some View {
         let clips = model.clips
         let clip = clips.indices.contains(index) ? clips[index] : Clip(start: 0, end: 0)
         PanelScaffold {
-            PanelHeader(back: { model.selectedClip = nil }, title: "Clip \(index + 1) of \(clips.count)",
-                        detail: "\(TimelineView.lengthLabel(clip.outputDuration)) in the video · recording \(Self.time(clip.start))–\(Self.time(clip.end))")
+            PanelHeader(back: { model.selectedClip = nil }, title: "Clip \(index + 1) of \(clips.count)")
 
             PanelSection("Speed") {
-                ChoiceButtons(choices: [1.0] + Settings.speedPresets, isSelected: { abs(clip.rate - $0) < 0.001 },
-                              label: { TimelineView.speedLabel($0) }) { model.setSpeed($0, ofClip: index) }
+                ChoiceButtons(choices: SpeedChoice.all, isSelected: { $0.isSelected(rate: clip.rate) },
+                              label: { $0.label }) { choice in
+                    switch choice {
+                    case .preset(let r): model.setSpeed(r, ofClip: index)
+                    case .custom: customFocused = true
+                    }
+                }
                 HStack(spacing: Theme.s2) {
-                    Text("Custom").font(.callout)
+                    Text("Custom").font(Theme.fontCallout)
                     Spacer()
-                    TextField("", text: $customText)
-                        .textFieldStyle(.roundedBorder)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 60)
-                        .onSubmit { applyCustom() }
-                    Text("×").font(.callout)
+                    NumberField(text: $customText, suffix: "×", focused: $customFocused) { applyCustom() }
                     Button("Apply") { applyCustom() }.buttonStyle(QuietButtonStyle())
                 }
-                PanelNote("From \(TimelineView.speedLabel(Settings.customSpeedRange.lowerBound)) to \(TimelineView.speedLabel(Settings.customSpeedRange.upperBound)).")
             }
-
+        } footer: {
             Button(role: .destructive) { model.deleteClip(index) } label: {
-                Label("Delete clip", systemImage: "trash")
+                HStack(spacing: Theme.s1 + 2) {
+                    Image(systemName: "trash").font(.system(size: 14, weight: .light))
+                    Text("Delete clip")
+                }
             }
-            .buttonStyle(QuietButtonStyle(destructive: true))
+            .buttonStyle(QuietButtonStyle(fullWidth: true))   // white text and icon (Mari, 2026-11-13)
             .disabled(clips.count < 2)
             .help(clips.count < 2 ? "The video needs at least one clip" : "Remove this clip from the video (Delete)")
         }

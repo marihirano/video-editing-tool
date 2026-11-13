@@ -271,6 +271,7 @@ do {
     // An edited export: split at 0.2, 0.6, 1.0, 1.4, 1.8; delete 0–0.2, 0.6–1.0, 1.8–2; 1.0–1.4 at 4×
     // → 0.4 + 0.1 + 0.4 = 0.9 s.
     var edited = Project(source: info.sourceVideo)
+    edited.style.kind = .solid   // plain background so this check does not depend on the default look
     for at in [0.2, 0.6, 1.0, 1.4, 1.8] { edited.timeline.split(atOutput: at, sourceDuration: info.duration) }
     for i in [5, 2, 0] { edited.timeline.deleteClip(i, sourceDuration: info.duration) }
     edited.timeline.setRate(4, ofClip: 1, sourceDuration: info.duration)

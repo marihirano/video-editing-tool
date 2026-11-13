@@ -13,7 +13,7 @@ final class CutMode {
     init(onCancel: @escaping () -> Void) { self.onCancel = onCancel }
 
     static let cursor: NSCursor = {
-        let config = NSImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        let config = NSImage.SymbolConfiguration(pointSize: 17, weight: .light)
         let symbol = NSImage(systemSymbolName: "scissors", accessibilityDescription: "Cut")!.withSymbolConfiguration(config)!
         let size = NSSize(width: symbol.size.width + 4, height: symbol.size.height + 4)
         // White scissors with a dark outline, so they show on any background.

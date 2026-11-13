@@ -13,14 +13,14 @@ struct ExportSheet: View {
             case .choosing:
                 ExportOptions()
             case .running(let progress):
-                Text("Exporting…").font(.headline)
+                Text("Exporting…").font(Theme.fontBody)
                 ProgressView(value: progress)
                 Text("\(Int(progress * 100))%  ·  \(model.exportSummary)")
-                    .foregroundStyle(Theme.secondaryText).font(.callout)
+                    .foregroundStyle(Theme.secondaryText).font(Theme.fontCallout)
                 HStack { Spacer(); Button("Cancel") { model.cancelExport() }.buttonStyle(QuietButtonStyle()).keyboardShortcut(.cancelAction) }
             case .finished(let url):
                 Label("Export finished", systemImage: "checkmark.circle.fill")
-                    .font(.headline).foregroundStyle(.green)
+                    .font(Theme.fontBody).foregroundStyle(.green)
                 Text(url.lastPathComponent).foregroundStyle(Theme.secondaryText)
                 HStack {
                     Spacer()
@@ -29,7 +29,7 @@ struct ExportSheet: View {
                 }
             case .failed(let message):
                 Label("Export failed", systemImage: "exclamationmark.triangle.fill")
-                    .font(.headline).foregroundStyle(.orange)
+                    .font(Theme.fontBody).foregroundStyle(.orange)
                 Text(message).foregroundStyle(Theme.secondaryText)
                 HStack { Spacer(); Button("OK") { model.dismissExport() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(Theme.accent).controlSize(.large) }
             case nil:
@@ -38,6 +38,7 @@ struct ExportSheet: View {
         }
         .padding(Theme.s5)
         .frame(width: 380)
+        .font(Theme.fontBody)
     }
 }
 
@@ -50,7 +51,7 @@ private struct ExportOptions: View {
     private var isGIF: Bool { output.format == .gif }
 
     var body: some View {
-        Text("Export").font(.title3.weight(.semibold))
+        Text("Export").font(Theme.fontTitle)
         ChoiceButtons(choices: [OutputSettings.Format.mp4, .gif], isSelected: { output.format == $0 },
                       label: { $0 == .mp4 ? "MP4 video" : "GIF" }) { f in model.setOutput { $0.format = f } }
 
@@ -63,10 +64,10 @@ private struct ExportOptions: View {
         }
 
         VStack(alignment: .leading, spacing: 2) {
-            Text(model.exportSummary).font(.callout)
-            Text(sizeText).font(.callout).foregroundStyle(Theme.secondaryText)
+            Text(model.exportSummary).font(Theme.fontCallout)
+            Text(sizeText).font(Theme.fontCallout).foregroundStyle(Theme.secondaryText)
             if isGIF { Text("GIFs get big quickly. For long clips, a smaller size or lower frame rate helps.")
-                .font(.caption).foregroundStyle(Theme.secondaryText).padding(.top, 2) }
+                .font(Theme.fontCaption).foregroundStyle(Theme.secondaryText).padding(.top, 2) }
         }
         .task(id: EstimateKey(project: model.project, isGIF: isGIF)) { await estimate() }
 
@@ -81,7 +82,7 @@ private struct ExportOptions: View {
 
     private func row(_ title: String, _ values: [Int], selected: Int, label: @escaping (Int) -> String, set: @escaping (Int) -> Void) -> some View {
         HStack {
-            Text(title).font(.callout).frame(width: 84, alignment: .leading)
+            Text(title).font(Theme.fontCallout).frame(width: 84, alignment: .leading)
             ChoiceButtons(choices: values, isSelected: { $0 == selected }, label: label, pick: set)
         }
     }

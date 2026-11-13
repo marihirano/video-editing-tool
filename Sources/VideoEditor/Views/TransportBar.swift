@@ -9,14 +9,10 @@ struct TransportBar: View {
 
     var body: some View {
         ZStack {
-            HStack(spacing: Theme.s1) {
+            HStack(spacing: Theme.s2) {
                 ToolButton(title: "Cut", systemImage: "scissors", isOn: model.isCutMode,
                            help: model.isCutMode ? "Click the timeline to cut; click Cut again (or Esc) to stop" : "Cut: turn on the scissors, then click the timeline where you want to cut") {
                     model.toggleCutMode()
-                }
-                ToolButton(title: "Crop", systemImage: "crop", isOn: model.isCropMode,
-                           help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
-                    model.toggleCropMode()
                 }
                 ToolButton(title: "Zoom", systemImage: "plus.magnifyingglass",
                            help: "Add a zoom at the blue line (⌥⌘Z)") {
@@ -28,23 +24,22 @@ struct TransportBar: View {
             HStack(spacing: Theme.s3) {
                 Button { playback.togglePlay() } label: {
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.playGlyph)
+                        .font(.system(size: 18))
+                        .foregroundStyle(Theme.playFill)
                         .offset(x: playback.isPlaying ? 0 : 1)   // a play triangle looks centred a touch right
                         .frame(width: Theme.playButtonSize, height: Theme.playButtonSize)
-                        .background(Circle().fill(Theme.playFill))
-                        .contentShape(Circle())
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.space, modifiers: [])
                 .help(playback.isPlaying ? "Pause (Space)" : "Play (Space)")
 
-                (Text(Self.tenths(playback.outputTime)).fontWeight(.medium).foregroundStyle(.primary)
+                (Text(Self.tenths(playback.outputTime)).foregroundStyle(.primary)
                  + Text(" / \(Self.tenths(playback.outputDuration))").foregroundStyle(Theme.secondaryText))
-                    .font(.system(size: 14).monospacedDigit())
+                    .font(Theme.fontBody.monospacedDigit())
             }
         }
-        .frame(height: Theme.playButtonSize)
+        .frame(height: Theme.transportHeight)
     }
 
     /// "0:05": minutes and whole seconds (the ruler's labels).

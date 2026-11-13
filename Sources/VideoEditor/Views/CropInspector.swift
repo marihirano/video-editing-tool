@@ -12,7 +12,7 @@ struct CropInspector: View {
         let h = Int((f.height * Double(p?.source.height ?? 0)).rounded())
         PanelScaffold {
             PanelHeader(back: { model.endCropMode() }, title: "Crop",
-                        detail: "Keeping \(w) × \(h) of \(p?.source.width ?? 0) × \(p?.source.height ?? 0) pixels")
+                        detail: "Keeping \(w) × \(h) of \(p?.source.width ?? 0) × \(p?.source.height ?? 0) pixels", alwaysShowTitle: true)
             PanelNote("Drag the corners or edges on the preview. Drag inside the box to move it.")
             HStack {
                 Button("Reset") { model.resetCrop() }

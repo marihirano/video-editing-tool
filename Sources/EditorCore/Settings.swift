@@ -23,9 +23,9 @@ public enum Settings {
     /// Plain colour used when the background is "Color" (RGBA, 0–1).
     public static let defaultBackground = RGBAColor(r: 0.09, g: 0.09, b: 0.11, a: 1)
     /// Which background a new project starts with, and which built-in one.
-    public static let defaultBackgroundKind = BackgroundKind.wallpaper
+    public static let defaultBackgroundKind = BackgroundKind.gradient
     public static let defaultWallpaper = 0
-    public static let defaultGradient = 2
+    public static let defaultGradient = 1   // Ocean (the blue one)
 
     /// Space around the video, as a percentage of the canvas height (same on all sides).
     public static let defaultPadding = 8.0
@@ -62,7 +62,7 @@ public enum Settings {
     ]
     /// The interface's accent blue (selected choices, tools that are on, the main button). A little
     /// deeper than the system blue so white text on it is easy to read.
-    public static let accentColor = RGBAColor(hex: 0x0A6FE0)
+    public static let accentColor = RGBAColor(hex: 0x0095A3)
     /// Colour of the app window behind the preview.
     public static let previewSurround = RGBAColor(r: 0.11, g: 0.11, b: 0.12, a: 1)
 
@@ -76,7 +76,7 @@ public enum Settings {
     /// Shortest clip a split can make, in seconds of finished video.
     public static let minimumClipSeconds = 0.1
     /// Height of each timeline track (clips on top, zooms below), in points.
-    public static let timelineTrackHeight: Double = 44
+    public static let timelineTrackHeight: Double = 40
     /// Gap drawn between clips on the timeline, in points.
     public static let timelineClipGap: Double = 4
     /// Timeline colours: clips (and the selected clip), the clip label (white), the blue edit line,
@@ -84,7 +84,7 @@ public enum Settings {
     public static let timelineClipColor = RGBAColor(hex: 0xE8900C)
     public static let timelineSelectedClipColor = RGBAColor(hex: 0xF6A833)
     public static let timelineClipLabelColor = RGBAColor(r: 1, g: 1, b: 1, a: 1)
-    public static let timelineEditLineColor = RGBAColor(hex: 0x4D9BFF)
+    public static let timelineEditLineColor = RGBAColor(hex: 0x0095A3)
     public static let timelinePlayheadColor = RGBAColor(r: 1, g: 1, b: 1, a: 1)
     public static let timelineZoomTrackColor = RGBAColor(hex: 0x241C38)
     /// How solid the clip and zoom bars' fill is (labels and the selection ring stay fully solid).
@@ -103,7 +103,12 @@ public enum Settings {
     public static let timelineRulerSteps: [Double] = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600]
     public static let timelineRulerMinLabelSpacing: Double = 60
     /// Room left of the tracks for each track's small icon, in points.
-    public static let timelineGutterWidth: Double = 28
+    public static let timelineGutterWidth: Double = 23
+    /// Space under the ruler before the clip track, and between the clip track and the zoom track, in points.
+    public static let timelineRulerToTrackGap: Double = 4
+    public static let timelineTrackGap: Double = 12
+    /// How far the playhead and blue line reach below the zoom track, in points.
+    public static let timelineLineOverhang: Double = 8
 
     // MARK: Zoom
     /// How far a new zoom goes (1.5 = 150%), and the range of the Amount slider.

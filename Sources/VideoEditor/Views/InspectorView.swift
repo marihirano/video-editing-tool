@@ -9,7 +9,7 @@ struct InspectorView: View {
 
     var body: some View {
         PanelScaffold {
-            PanelHeader(title: "Style", detail: "Background, frame and shadow")
+            PanelHeader(title: "Style")
             PanelSection("Background") { backgroundControls }
             PanelSection("Frame") {
                 slider("Padding", value: \.padding, range: Settings.paddingRange, unit: "%")
@@ -21,14 +21,14 @@ struct InspectorView: View {
                 slider("Distance", value: \.shadowOffset, range: Settings.shadowOffsetRange, unit: " px")
             }
             Button("Reset style") { model.updateStyle { $0 = FrameStyle() } }
-                .buttonStyle(QuietButtonStyle())
+                .buttonStyle(QuietButtonStyle(fullWidth: true))
         }
     }
 
     // MARK: Background
 
     @ViewBuilder private var backgroundControls: some View {
-        ChoiceButtons(choices: [BackgroundKind.wallpaper, .gradient, .solid, .image],
+        ChoiceButtons(choices: [BackgroundKind.gradient, .wallpaper, .solid, .image],
                       isSelected: { style.kind == $0 },
                       label: { k in
                           switch k {
@@ -75,13 +75,13 @@ struct InspectorView: View {
             .buttonStyle(QuietButtonStyle())
             if let path = style.imagePath {
                 Text(URL(fileURLWithPath: path).lastPathComponent)
-                    .font(.caption).foregroundStyle(Theme.secondaryText).lineLimit(1).truncationMode(.middle)
+                    .font(Theme.fontCaption).foregroundStyle(Theme.secondaryText).lineLimit(1).truncationMode(.middle)
             }
         }
     }
 
     private func swatchGrid<C: View>(columns: Int = 3, @ViewBuilder _ content: () -> C) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s2), count: columns), spacing: Theme.s2, content: content)
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s3), count: columns), spacing: Theme.s3, content: content)
     }
 
     private func swatch(selected: Bool, name: String, fill: AnyShapeStyle, image: CGImage? = nil, action: @escaping () -> Void) -> some View {
@@ -90,8 +90,13 @@ struct InspectorView: View {
                 .fill(fill)
                 .overlay { if let image { Image(decorative: image, scale: 1).resizable() } }
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
-                .frame(height: 38)
-                .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(selected ? Theme.accent : Theme.hairline, lineWidth: selected ? 2 : 1))
+                .frame(height: 36)
+                // Chosen: a 2 pt accent ring just outside the swatch.
+                .overlay {
+                    if selected {
+                        RoundedRectangle(cornerRadius: Theme.radius + 1).stroke(Theme.accent, lineWidth: 2).padding(-1)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .help(name)

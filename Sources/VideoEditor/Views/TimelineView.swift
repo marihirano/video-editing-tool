@@ -31,10 +31,13 @@ struct TimelineView: View {
     }
 
     private let trackH = Settings.timelineTrackHeight
-    private let trackGap: CGFloat = Theme.s2
+    private let trackGap = Settings.timelineTrackGap
     private let rulerH = Settings.timelineRulerHeight
     private let gutterW = Settings.timelineGutterWidth
-    private var totalH: CGFloat { rulerH + trackH * 2 + trackGap }
+    /// Top of the clip track and of the zoom track, from the top of the ruler.
+    private var clipTop: CGFloat { rulerH + Settings.timelineRulerToTrackGap }
+    private var zoomTop: CGFloat { clipTop + trackH + trackGap }
+    private var totalH: CGFloat { zoomTop + trackH }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -44,7 +47,7 @@ struct TimelineView: View {
             }
         }
         .frame(height: totalH)
-        .padding(.horizontal, Theme.panelPadding)
+        .padding(.horizontal, Theme.timelineMargin)
         .padding(.top, Theme.s5)
         .padding(.bottom, Theme.s4)
         .onAppear {
@@ -61,20 +64,20 @@ struct TimelineView: View {
     /// A small icon left of each track: a film strip for clips, a magnifier for zooms.
     private var gutter: some View {
         ZStack(alignment: .topLeading) {
-            trackIcon("film", help: "Clips").offset(y: rulerH)
-            trackIcon("magnifyingglass", help: "Zooms").offset(y: rulerH + trackH + trackGap)
+            trackIcon("film", help: "Clips").offset(y: clipTop)
+            trackIcon("magnifyingglass", help: "Zooms").offset(y: zoomTop)
         }
         .frame(width: gutterW, height: totalH, alignment: .topLeading)
     }
 
     private func trackIcon(_ name: String, help: String) -> some View {
-        Image(systemName: name).font(.system(size: 13)).foregroundStyle(Theme.trackIcon)
+        Image(systemName: name).font(.system(size: 13, weight: .light)).foregroundStyle(Theme.trackIcon)
             .frame(width: gutterW, height: trackH, alignment: .leading)
             .accessibilityLabel(help)
             .help(help)
     }
 
-    /// Ticks and times along the top. The step (1 s, 2 s, 5 s…) is the smallest that keeps labels apart.
+    /// Dots and times along the top. The step (1 s, 2 s, 5 s…) is the smallest that keeps labels apart.
     private func ruler(width w: CGFloat, total: Double) -> some View {
         let step = Settings.timelineRulerSteps.first { $0 / total * w >= Settings.timelineRulerMinLabelSpacing }
             ?? Settings.timelineRulerSteps.last!
@@ -83,12 +86,12 @@ struct TimelineView: View {
             .filter { CGFloat($0 / total) * w <= w - 30 }   // room for the last label
         return ZStack(alignment: .topLeading) {
             ForEach(ticks, id: \.self) { t in
-                HStack(alignment: .top, spacing: Theme.s1) {
-                    Rectangle().fill(Theme.rulerTick).frame(width: 1, height: rulerH - 2)
-                    Text(TransportBar.format(t)).font(.system(size: 11).monospacedDigit()).foregroundStyle(Theme.rulerText)
+                HStack(alignment: .center, spacing: Theme.s1) {
+                    Circle().fill(Theme.rulerTick).frame(width: 4, height: 4)
+                    Text(TransportBar.format(t)).font(Theme.fontSmall.monospacedDigit()).foregroundStyle(Theme.rulerText)
                         .fixedSize()
                 }
-                .offset(x: CGFloat(t / total) * w, y: 2)
+                .offset(x: CGFloat(t / total) * w)
             }
             Rectangle().fill(Theme.rulerLine).frame(width: w, height: 1).offset(y: rulerH - 1)
         }
@@ -105,8 +108,6 @@ struct TimelineView: View {
         let t = { (x: CGFloat) in min(max(Double(x / w) * total, 0), total) }
         let clips = model.clips
         let starts = map?.pieces.map(\.outputStart) ?? []
-        let clipTop = rulerH
-        let zoomTop = rulerH + trackH + trackGap
         let zoomRanges = model.zoomRanges
         let zooms = model.zooms
 
@@ -142,7 +143,7 @@ struct TimelineView: View {
                 .fill(Color(rgba: Settings.timelineZoomTrackColor))
                 .overlay {
                     if zooms.isEmpty && ghost == nil && placeholder == nil {
-                        Text("Click or drag to add a zoom").font(.callout).foregroundStyle(Theme.tertiaryText)
+                        Text("Click or drag to add a zoom").font(Theme.fontCallout).foregroundStyle(Theme.tertiaryText)
                     }
                 }
                 .frame(width: w, height: trackH)
@@ -264,35 +265,33 @@ struct TimelineView: View {
     private static let handleW: CGFloat = 12
     private static let handleH: CGFloat = 14
     /// How far the lines reach below the zoom track.
-    private static let lineOverhang: CGFloat = 2
+    private static let lineOverhang = CGFloat(Settings.timelineLineOverhang)
 
-    /// The playhead: a 2 pt white line with a handle (rounder at the bottom) sitting in the ruler.
+    /// The playhead: a 2 pt white line starting 14 pt down, with a 12 pt round handle (3 pt down) in the ruler.
     private var playheadLine: some View {
-        let top: CGFloat = 4
-        return ZStack(alignment: .top) {
-            Rectangle().fill(Theme.playhead).frame(width: 2, height: totalH - top - Self.handleH / 2 + Self.lineOverhang)
-                .offset(y: Self.handleH / 2)
-            UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 6, bottomTrailingRadius: 6, topTrailingRadius: 3)
-                .fill(Theme.playhead).frame(width: Self.handleW, height: Self.handleH)
+        ZStack(alignment: .top) {
+            Rectangle().fill(Theme.playhead).frame(width: 2, height: totalH + Self.lineOverhang - 14)
+                .offset(y: 14)
+            Circle().fill(Theme.playhead).frame(width: Self.handleW, height: Self.handleW)
+                .offset(y: 3)
         }
-        .frame(width: Self.handleW, alignment: .top)
-        .offset(y: top)
+        .frame(width: Self.handleW, height: totalH + Self.lineOverhang, alignment: .top)
         .allowsHitTesting(false)
     }
 
-    /// The blue line: 1 pt, no knob, with a small label of its time (tenths) above it, kept inside the timeline.
+    /// The blue line: 1 pt, no knob, with a small label of its time (tenths) at its top, kept inside the timeline.
     private func editLine(at px: CGFloat, time: Double, width w: CGFloat) -> some View {
         let text = TransportBar.tenths(time)
-        let labelH: CGFloat = 17, labelTop: CGFloat = 1
-        // Width of the label: digits are about 6.7 pt at 11 pt semibold, ":" and "." about 3.2 pt, plus 5 pt padding each side.
+        let labelH: CGFloat = 21, labelTop: CGFloat = 2
+        // Width of the label: digits are about 7.15 pt in 11 pt Inter (even-width digits), ":" and "." about 3 pt, plus 6 pt padding each side.
         let digits = text.filter(\.isNumber).count
-        let labelW = CGFloat(digits) * 6.7 + CGFloat(text.count - digits) * 3.2 + 10
+        let labelW = CGFloat(digits) * 7.15 + CGFloat(text.count - digits) * 3.0 + 12
         let labelX = min(max(px - labelW / 2, 0), w - labelW)
         let lineTop = labelTop + labelH
         return ZStack(alignment: .topLeading) {
             Rectangle().fill(Theme.editLine).frame(width: 1, height: totalH - lineTop + Self.lineOverhang)
                 .offset(x: px - 0.5, y: lineTop)
-            Text(text).font(.system(size: 11, weight: .semibold).monospacedDigit()).foregroundStyle(.white)
+            Text(text).font(Theme.fontSmall.monospacedDigit()).foregroundStyle(Theme.secondaryText)
                 .fixedSize()
                 .frame(width: labelW, height: labelH)
                 .background(RoundedRectangle(cornerRadius: Theme.radiusSmall).fill(Theme.accent))
@@ -321,17 +320,18 @@ private struct ClipBar: View {
         GeometryReader { geo in
             RoundedRectangle(cornerRadius: Theme.radius)
                 .fill((selected ? Theme.clipSelected : Theme.clip).opacity(Settings.timelineBarOpacity))
+                .innerShadow(radius: Theme.radius, color: .black.opacity(0.25), y: 7, blur: 20)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.clipSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
                 .overlay(alignment: .leading) {
                     if geo.size.width > 56 {
                         HStack(spacing: Theme.s2) {
-                            Text(TimelineView.lengthLabel(clip.outputDuration)).fontWeight(.semibold)
-                            Text(TimelineView.speedLabel(clip.rate)).fontWeight(.medium).opacity(0.8)
+                            Text(TimelineView.lengthLabel(clip.outputDuration))
+                            Text(TimelineView.speedLabel(clip.rate)).opacity(0.8)
                         }
-                        .font(.system(size: 13))
+                        .font(Theme.fontBody)
                         .foregroundStyle(Theme.clipLabel)
                         .lineLimit(1)
-                        .padding(.leading, Theme.barLabelInset)
+                        .padding(.leading, Theme.barLabelInset + (selected ? 1 : 0))
                     }
                 }
         }
@@ -349,13 +349,13 @@ private struct ZoomBar: View {
             let percent = "\(Int((scale * 100).rounded()))%"
             RoundedRectangle(cornerRadius: Theme.radius)
                 .fill(Theme.zoom.opacity(Settings.timelineBarOpacity))
+                .innerShadow(radius: Theme.radius, color: .black.opacity(0.25), y: 7, blur: 20)
                 .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.zoomSelected, lineWidth: selected ? Settings.timelineSelectionRingWidth : 0))
                 .overlay(alignment: .leading) {
-                    // When selected, the label moves right so it never sits under the left grip.
-                    let inset = selected ? Theme.barLabelInset + 8 : Theme.barLabelInset
+                    let inset = Theme.barLabelInset + (selected ? 1 : 0)
                     if geo.size.width > inset + 34 {
                         Text(percent)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Theme.fontBody)
                             .foregroundStyle(.white)
                             .lineLimit(1)
                             .padding(.leading, inset)
@@ -369,7 +369,7 @@ private struct ZoomBar: View {
 
     /// Small bars at each end of the selected zoom, hinting that the ends can be dragged.
     private var grip: some View {
-        RoundedRectangle(cornerRadius: 1).fill(.white.opacity(0.85)).frame(width: 2, height: 14).padding(.horizontal, 6)
+        RoundedRectangle(cornerRadius: 1).fill(.white).frame(width: 2, height: 14).padding(.horizontal, 7)
     }
 }
 
@@ -380,7 +380,7 @@ private struct ZoomPlaceholder: View {
         RoundedRectangle(cornerRadius: Theme.radius)
             .fill(color.opacity(0.22))
             .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(color, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
-            .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white.opacity(0.9)))
+            .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .light)).foregroundStyle(.white.opacity(0.9)))
             .allowsHitTesting(false)
     }
 }

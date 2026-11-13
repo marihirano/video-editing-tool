@@ -61,7 +61,7 @@ public enum FrameLayout {
         let zoomed = Float(1 / camera.width)
         let content = CGRect(x: (framed.minX - camera.minX) / camera.width, y: (framed.minY - camera.minY) / camera.height,
                              width: framed.width / camera.width, height: framed.height / camera.height)
-        let k = Float(canvas.height / 1080)   // style sizes are written for a 1080-tall canvas
+        let k = Float(min(canvas.width, canvas.height) / 1080)   // style sizes are written for a canvas whose shorter side is 1080
 
         func v(_ c: RGBAColor) -> SIMD4<Float> { SIMD4(Float(c.r), Float(c.g), Float(c.b), Float(c.a)) }
         let wp = Settings.wallpapers[min(max(style.wallpaper, 0), Settings.wallpapers.count - 1)].colors
@@ -106,10 +106,12 @@ public enum FrameLayout {
     }
 
     /// Frame: where the video sits on the canvas, as fractions of the canvas. The padding
-    /// (a percentage of the canvas height) is kept free on every side; the video is fitted
-    /// inside what's left and centred.
+    /// (a percentage of the canvas's shorter side, so it looks the same in every shape) is kept
+    /// free on every side; the video keeps its own shape, fitted inside what's left and centred
+    /// (in 9:16 a wide recording is a band with background above and below).
     static func frameStep(contentAspect: CGFloat, canvas: CGSize, paddingPercent: Double) -> CGRect {
-        let pad = min(canvas.height * CGFloat(paddingPercent) / 100, min(canvas.width, canvas.height) * 0.45)
+        let short = min(canvas.width, canvas.height)
+        let pad = min(short * CGFloat(paddingPercent) / 100, short * 0.45)
         let availW = canvas.width - 2 * pad, availH = canvas.height - 2 * pad
         var w = availW, h = availW / contentAspect
         if h > availH { h = availH; w = availH * contentAspect }

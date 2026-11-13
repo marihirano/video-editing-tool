@@ -46,6 +46,7 @@ enum Theme {
     static let timelineMargin: CGFloat = 24   // left and right of the timeline
     static let transportHeight: CGFloat = 64 // the tools / play / time row under the preview
     static let cropRowHeight: CGFloat = 48   // the Crop button centred above the preview
+    static let transportMinWidth: CGFloat = 420 // the tools / play / time row never gets narrower (9:16 previews are narrow)
     static let sectionGap: CGFloat = 32      // between sections of a panel
     static let controlHeight: CGFloat = 32   // choice buttons, icon buttons
     static let iconButtonWidth: CGFloat = 32

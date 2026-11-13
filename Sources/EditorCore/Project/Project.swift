@@ -62,38 +62,78 @@ public struct SourceVideo: Codable, Equatable, Sendable {
     }
 }
 
-/// Size and frame rate of the exported video. A setting from day one, so other
-/// aspect ratios are cheap to add later.
+/// The shape of the finished video: widescreen, square or vertical.
+public enum VideoShape: String, Codable, CaseIterable, Sendable {
+    case wide, square, vertical
+    /// Width divided by height (16:9, 1:1, 9:16).
+    public var aspect: Double {
+        let r = Settings.wideAspect
+        switch self {
+        case .wide: return r
+        case .square: return 1
+        case .vertical: return 1 / r
+        }
+    }
+    /// "16:9", "1:1", "9:16".
+    public var ratioLabel: String {
+        switch self {
+        case .wide: return "16:9"
+        case .square: return "1:1"
+        case .vertical: return "9:16"
+        }
+    }
+}
+
+/// Shape, size and frame rate of the exported video. The canvas size is a setting from day one,
+/// so the renderer draws any shape.
 public struct OutputSettings: Codable, Equatable, Sendable {
     public enum Format: String, Codable, Sendable { case mp4, gif }
-    /// MP4 size and frame rate (width/height stay 16:9; see `OutputSettings.size(forHeight:)`).
+    /// Widescreen, square or vertical. Older projects (no shape saved) are widescreen.
+    public var shape: VideoShape = Settings.defaultVideoShape
+    /// MP4 size and frame rate. Width and height always follow `shape`; the size choices
+    /// (720p, 1080p, 4K) are the shorter side (see `OutputSettings.size(level:shape:)`).
     public var width: Int = Settings.defaultOutputWidth
     public var height: Int = Settings.defaultOutputHeight
     public var fps: Int = Settings.defaultOutputFPS
-    /// What the Export button makes, and the GIF's own height and frame rate.
+    /// What the Export button makes, and the GIF's own size (its shorter side) and frame rate.
     public var format: Format = .mp4
     public var gifHeight: Int = Settings.defaultGIFHeight
     public var gifFPS: Int = Settings.defaultGIFFPS
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case width, height, fps, format, gifHeight, gifFPS }
+    enum CodingKeys: String, CodingKey { case shape, width, height, fps, format, gifHeight, gifFPS }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        shape = try c.decodeIfPresent(VideoShape.self, forKey: .shape) ?? .wide
         width = try c.decodeIfPresent(Int.self, forKey: .width) ?? width
         height = try c.decodeIfPresent(Int.self, forKey: .height) ?? height
         fps = try c.decodeIfPresent(Int.self, forKey: .fps) ?? fps
         format = try c.decodeIfPresent(Format.self, forKey: .format) ?? format
         gifHeight = try c.decodeIfPresent(Int.self, forKey: .gifHeight) ?? gifHeight
         gifFPS = try c.decodeIfPresent(Int.self, forKey: .gifFPS) ?? gifFPS
+        setMP4Height(mp4Level)   // keeps width and height in step with the shape
+    }
+
+    /// A canvas of the given shape whose shorter side is `level` (the longer side rounded to an even number).
+    public static func size(level: Int, shape: VideoShape) -> (width: Int, height: Int) {
+        let long = Int((Double(level) * Settings.wideAspect / 2).rounded()) * 2
+        switch shape {
+        case .wide: return (long, level)
+        case .square: return (level, level)
+        case .vertical: return (level, long)
+        }
     }
 
     /// A 16:9 canvas of the given height (width rounded to an even number).
-    public static func size(forHeight h: Int) -> (width: Int, height: Int) {
-        (Int((Double(h) * 16 / 9 / 2).rounded()) * 2, h)
-    }
+    public static func size(forHeight h: Int) -> (width: Int, height: Int) { size(level: h, shape: .wide) }
 
-    public mutating func setMP4Height(_ h: Int) { let s = Self.size(forHeight: h); width = s.width; height = s.height }
-    public var gifSize: (width: Int, height: Int) { Self.size(forHeight: gifHeight) }
+    /// The MP4 size choice: the shorter side (720, 1080 or 2160).
+    public var mp4Level: Int { min(width, height) }
+    /// Sets the MP4 size from its shorter side (720, 1080 or 2160), in the current shape.
+    public mutating func setMP4Height(_ level: Int) { let s = Self.size(level: level, shape: shape); width = s.width; height = s.height }
+    /// Changes the shape; MP4 and GIF keep their size choices.
+    public mutating func setShape(_ new: VideoShape) { let level = mp4Level; shape = new; setMP4Height(level) }
+    public var gifSize: (width: Int, height: Int) { Self.size(level: gifHeight, shape: shape) }
 }
 
 /// Edits over time.

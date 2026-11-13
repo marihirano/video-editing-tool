@@ -1,4 +1,5 @@
 import AppKit
+import EditorCore
 
 /// For Claude's checks: launched with VET_SNAPSHOT=/path.png (and a video to open), the app
 /// saves a picture of its window, logs whether the preview drew video, and quits.
@@ -11,6 +12,10 @@ enum DebugSnapshot {
             let model = EditorModel.shared
             // VET_SNAPSHOT_APPEARANCE=light|dark|system forces the look for this run only (nothing is saved).
             if let mode = ProcessInfo.processInfo.environment["VET_SNAPSHOT_APPEARANCE"] { Theme.AppearanceMode.apply(mode) }
+            // VET_SNAPSHOT_SHAPE=wide|square|vertical picks the video's shape (same path as the Style panel's choice).
+            if let raw = ProcessInfo.processInfo.environment["VET_SNAPSHOT_SHAPE"], let shape = VideoShape(rawValue: raw) {
+                model.setOutput { $0.setShape(shape) }
+            }
             // VET_SNAPSHOT_SPLIT=1 cuts once with the scissors tool at a third of the way and pins the blue line there.
             if ProcessInfo.processInfo.environment["VET_SNAPSHOT_SPLIT"] != nil, let map = model.timeMap {
                 model.startCutMode()                       // same path as the scissors button
@@ -52,7 +57,7 @@ enum DebugSnapshot {
                     view.cacheDisplay(in: view.bounds, to: rep)
                     try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: file))
                 }
-                let line = "zooms=\(model.zooms.count) crop=\(String(describing: model.project?.crop)) project=\(model.project != nil) playing=\(model.playback.isPlaying) time=\(model.playback.currentTime) videoFramesDrawn=\(model.drawer?.videoFramesDrawn ?? -1)\n"
+                let line = "shape=\(model.project?.output.shape.rawValue ?? "-") zooms=\(model.zooms.count) crop=\(String(describing: model.project?.crop)) project=\(model.project != nil) playing=\(model.playback.isPlaying) time=\(model.playback.currentTime) videoFramesDrawn=\(model.drawer?.videoFramesDrawn ?? -1)\n"
                 try? line.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
                 exit(0)   // quit without the save prompt (the snapshot may have made edits)
             }

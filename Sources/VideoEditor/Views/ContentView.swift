@@ -110,8 +110,9 @@ private extension ToolbarContent {
     }
 }
 
-/// The preview, kept at the output's shape (16:9 for 1080p), with the tools / play / time row right
-/// under it. The row is exactly as wide as the preview, so the tools line up with its left edge.
+/// The preview, kept at the output's shape (16:9, 1:1 or 9:16), with the tools / play / time row right
+/// under it. The row is as wide as the preview, so the tools line up with its left edge, but never
+/// narrower than `Theme.transportMinWidth` (a 9:16 preview is narrow).
 struct PreviewArea: View {
     @EnvironmentObject private var model: EditorModel
 
@@ -121,12 +122,17 @@ struct PreviewArea: View {
         GeometryReader { geo in
             let spare = Theme.transportHeight + Theme.cropRowHeight
             let w = min(geo.size.width, max(geo.size.height - spare, 1) * aspect)
+            // A tall (9:16) or square preview is narrow, so the tools / play / time row keeps a minimum width.
+            let rowW = min(geo.size.width, max(w, Theme.transportMinWidth))
             VStack(spacing: 0) {
-                ToolButton(title: "Crop", systemImage: "crop", isOn: model.isCropMode, showsTitle: true,
-                           help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
-                    model.toggleCropMode()
+                HStack(spacing: Theme.s3) {
+                    ShapeMenu()
+                    ToolButton(title: "Crop", systemImage: "crop", isOn: model.isCropMode, showsTitle: true,
+                               help: model.isCropMode ? "Done cropping" : "Crop: drag handles on the preview to keep only part of the recording") {
+                        model.toggleCropMode()
+                    }
                 }
-                .frame(width: w, height: Theme.cropRowHeight)
+                .frame(width: max(w, Theme.transportMinWidth), height: Theme.cropRowHeight)
                 Group {
                     if let drawer = model.drawer {
                         PreviewView(drawer: drawer)
@@ -137,7 +143,7 @@ struct PreviewArea: View {
                     }
                 }
                 .frame(width: w, height: w / aspect)
-                TransportBar().frame(width: w)
+                TransportBar().frame(width: rowW)
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }

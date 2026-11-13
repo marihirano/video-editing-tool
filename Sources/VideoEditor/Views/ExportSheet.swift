@@ -52,6 +52,8 @@ private struct ExportOptions: View {
 
     var body: some View {
         Text("Export").font(Theme.fontTitle)
+        Text("\(output.shape.ratioLabel) video. Change the shape with the button above the preview.")
+            .font(Theme.fontCaption).foregroundStyle(Theme.secondaryText)
         ChoiceButtons(choices: [OutputSettings.Format.mp4, .gif], isSelected: { output.format == $0 },
                       label: { $0 == .mp4 ? "MP4 video" : "GIF" }) { f in model.setOutput { $0.format = f } }
 
@@ -59,7 +61,7 @@ private struct ExportOptions: View {
             row("Size", Settings.gifHeights, selected: output.gifHeight, label: { "\($0)p" }) { h in model.setOutput { $0.gifHeight = h } }
             row("Frame rate", Settings.gifFPSChoices, selected: output.gifFPS, label: { "\($0)" }) { f in model.setOutput { $0.gifFPS = f } }
         } else {
-            row("Size", Settings.mp4Heights, selected: output.height, label: { $0 == 2160 ? "4K" : "\($0)p" }) { h in model.setOutput { $0.setMP4Height(h) } }
+            row("Size", Settings.mp4Heights, selected: output.mp4Level, label: { $0 == 2160 ? "4K" : "\($0)p" }) { h in model.setOutput { $0.setMP4Height(h) } }
             row("Frame rate", Settings.mp4FPSChoices, selected: output.fps, label: { "\($0)" }) { f in model.setOutput { $0.fps = f } }
         }
 

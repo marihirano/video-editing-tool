@@ -18,6 +18,10 @@ public enum Settings {
     public static let defaultOutputWidth = 1920
     public static let defaultOutputHeight = 1080
     public static let defaultOutputFPS = 60
+    /// Shape of a new project's video, and the widescreen ratio (16:9) the other shapes are built from:
+    /// square is 1:1, vertical is 9:16. Sizes (720p, 1080p, 4K) are the shorter side in every shape.
+    public static let defaultVideoShape = VideoShape.wide
+    public static let wideAspect = 16.0 / 9.0
 
     // MARK: Look
     /// Plain colour used when the background is "Color" (RGBA, 0–1).
@@ -27,10 +31,11 @@ public enum Settings {
     public static let defaultWallpaper = 0
     public static let defaultGradient = 1   // Ocean (the blue one)
 
-    /// Space around the video, as a percentage of the canvas height (same on all sides).
+    /// Space around the video, as a percentage of the canvas's shorter side (its height in 16:9,
+    /// its width in 9:16; same on all sides).
     public static let defaultPadding = 8.0
     public static let paddingRange = 0.0...25.0
-    /// Rounded-corner size, in pixels on a 1080-tall canvas (scales with the output size).
+    /// Rounded-corner size, in pixels on a canvas whose shorter side is 1080 (scales with the output size).
     public static let defaultCornerRadius = 14.0
     public static let cornerRadiusRange = 0.0...60.0
     /// Drop shadow. Blur and distance are in pixels on a 1080-tall canvas.
@@ -147,10 +152,10 @@ public enum Settings {
     public static let undoLimit = 200
 
     // MARK: Export
-    /// Heights offered for MP4 (width follows at 16:9) and the frame rates offered.
+    /// Sizes offered for MP4, as the shorter side (1080 = 1920×1080, 1080×1080 or 1080×1920), and the frame rates offered.
     public static let mp4Heights = [720, 1080, 2160]
     public static let mp4FPSChoices = [30, 60]
-    /// GIF: heights up to 1080p; frame rates stay low because GIFs get big fast.
+    /// GIF: sizes (shorter side) up to 1080p; frame rates stay low because GIFs get big fast.
     public static let gifHeights = [480, 720, 1080]
     public static let gifFPSChoices = [10, 15, 20, 25]
     public static let defaultGIFHeight = 720

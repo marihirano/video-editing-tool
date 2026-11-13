@@ -333,6 +333,39 @@ do {
     check(cropOK, "crop export shows the cropped part (colour differences:\(cropR))")
     let (zoomOK, zoomR) = try await matches(out5, at: 1, [((960, 540), (192, 120)), ((960, 900), (192, 160)), ((528, 540), (144, 120)), ((1392, 540), (240, 120))])
     check(zoomOK, "zoom export shows 2× around the point (colour differences:\(zoomR))")
+    // 9:16 framed + zoomed: magenta background, 8% padding, 2× zoom near the video's top-right
+    // corner. The view stops at the picture's right edge, so the right padding and the background
+    // above the band show; inside the band each spot shows the right part of the recording.
+    var tall = Project(source: info.sourceVideo)
+    tall.output.setShape(.vertical)
+    tall.style.kind = .solid; tall.style.background = RGBAColor(r: 1, g: 0, b: 1, a: 1)
+    tall.style.padding = 8; tall.style.cornerRadius = 0; tall.style.shadowOpacity = 0
+    tall.timeline.zooms = [ZoomSegment(range: TimeRange(start: 0, end: 2), centerX: 0.95, centerY: 0.05, scale: 2, transition: 0.3, bounce: 0)]
+    let out7 = tmp.appendingPathComponent("tall-zoom.mp4")
+    try await Exporter().export(project: tall, sourceURL: source, to: out7) { _ in }
+    let tallSize = try await AVURLAsset(url: out7).loadTracks(withMediaType: .video)[0].load(.naturalSize)
+    check(tallSize == CGSize(width: 1080, height: 1920), "9:16 export is 1080×1920 (\(Int(tallSize.width))×\(Int(tallSize.height)))")
+    let tu = FrameLayout.uniforms(project: tall, sourceSize: CGSize(width: 1440, height: 900), outputTime: 1)
+    let tc = (x: Double(tu.contentRect.x), y: Double(tu.contentRect.y), w: Double(tu.contentRect.z), h: Double(tu.contentRect.w))
+    check(abs(Double(tu.camera.x) - 0.5) < 1e-4 && abs(Double(tu.camera.z) - 0.5) < 1e-4,
+          "9:16 zoom near the edge stops at the picture's right edge (camera x \(tu.camera.x))")
+    func tallSource(_ px: Int, _ py: Int) -> (Double, Double) {
+        ((Double(px) / 1080 - tc.x) / tc.w * 1440, (Double(py) / 1920 - tc.y) / tc.h * 900)
+    }
+    let inBand = [(540, 1300), (300, 1500), (800, 1200)]
+    let tallGot = try await rgb(out7, 1, inBand + [(540, 400), (1050, 1300)])
+    let r0 = FrameLayout.contentRect(project: Project(source: info.sourceVideo), mode: .normal)
+    let tallWant = try await rgb(out, 1, inBand.map { let s = tallSource($0.0, $0.1)
+        return (Int((r0.minX + s.0 / 1440 * r0.width) * 1920), Int((r0.minY + s.1 / 900 * r0.height) * 1080)) })
+    var bandOK = true, bandR = ""
+    for (g, w) in zip(tallGot, tallWant) {
+        let d = abs(g.0 - w.0) + abs(g.1 - w.1) + abs(g.2 - w.2)
+        bandR += String(format: " %.0f", d); if d > 30 { bandOK = false }
+    }
+    check(bandOK, "9:16 zoom shows the right part of the recording in the band (colour differences:\(bandR))")
+    func magenta(_ c: (Double, Double, Double)) -> Bool { abs(c.0 - 255) + c.1 + abs(c.2 - 255) < 90 }
+    check(magenta(tallGot[3]), "9:16 zoom near the top edge shows the background above the band \(tallGot[3])")
+    check(magenta(tallGot[4]), "9:16 zoom near the right edge shows the padding \(tallGot[4])")
     // Example frames of a zoom with the default look, for eyeballing (only with VET_CHECK_FRAME_DIR).
     if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] {
         var look = Project(source: info.sourceVideo)
@@ -346,6 +379,21 @@ do {
             let (img, _) = try await g.image(at: CMTime(seconds: t, preferredTimescale: 600))
             try NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])?
                 .write(to: URL(fileURLWithPath: dir).appendingPathComponent("zoom-look-\(t).png"))
+        }
+        // The same zoom in each shape, with the default look: before and fully in.
+        for shape in VideoShape.allCases {
+            var p = look
+            p.output.setShape(shape)
+            let url = tmp.appendingPathComponent("look-\(shape.rawValue).mp4")
+            try await Exporter().export(project: p, sourceURL: source, to: url) { _ in }
+            let sg = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            sg.maximumSize = CGSize(width: 640, height: 640)
+            sg.requestedTimeToleranceBefore = .zero; sg.requestedTimeToleranceAfter = .zero
+            for t in [0.0, 1.0] {
+                let (img, _) = try await sg.image(at: CMTime(seconds: t, preferredTimescale: 600))
+                try NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])?
+                    .write(to: URL(fileURLWithPath: dir).appendingPathComponent("shape-\(shape.rawValue)-\(t).png"))
+            }
         }
     }
     let (startOK, startR) = try await matches(out5, at: 0, [((960, 900), (192, 200)), ((528, 540), (96, 120))])
@@ -422,6 +470,65 @@ do {
     let (a, b) = (centre(mp4Frame), centre(gifFrame))
     check(abs(a.0 - b.0) + abs(a.1 - b.1) + abs(a.2 - b.2) < 45, "GIF frame looks like the MP4 frame (\(a) vs \(b))")
     if let dir = ProcessInfo.processInfo.environment["VET_CHECK_FRAME_DIR"] { try? FileManager.default.copyItem(at: gifURL, to: URL(fileURLWithPath: dir).appendingPathComponent("m5.gif")) }
+}
+
+print("Video shape")
+do {
+    let oldFile = #"{"source":{"path":"/x.mov","width":10,"height":10,"duration":1},"output":{"width":1920,"height":1080,"fps":60}}"#
+    let o = try JSONDecoder().decode(Project.self, from: Data(oldFile.utf8)).output
+    check(o.shape == .wide && o.width == 1920 && o.height == 1080, "an older project opens as 16:9 1920×1080")
+    let sizes = VideoShape.allCases.map { OutputSettings.size(level: 1080, shape: $0) }
+    check(sizes.map(\.width) == [1920, 1080, 1080] && sizes.map(\.height) == [1080, 1080, 1920], "1080p is 1920×1080, 1080×1080 and 1080×1920")
+    var out = OutputSettings()
+    out.setMP4Height(2160); out.gifHeight = 480; out.setShape(.vertical)
+    check(out.width == 2160 && out.height == 3840 && out.mp4Level == 2160 && out.gifSize == (480, 854),
+          "changing the shape keeps the size choices (4K vertical 2160×3840, GIF 480×854)")
+    var proj = Project(source: SourceVideo(path: "/x.mov", width: 10, height: 10, duration: 1))
+    proj.output.setShape(.square)
+    let back = try JSONDecoder().decode(Project.self, from: JSONEncoder().encode(proj))
+    check(back.output.shape == .square && back.output.width == 1080 && back.output.height == 1080, "the shape survives save and reopen")
+
+    // Layout: padding is a share of the shorter side, the recording keeps its shape.
+    var lay = Project(source: SourceVideo(path: "", width: 1440, height: 900, duration: 1))
+    lay.style.padding = 8
+    lay.output.setShape(.vertical)
+    let v = FrameLayout.contentRect(project: lay, mode: .normal)
+    check(abs(v.minX - 0.08) < 1e-6 && abs(v.width * 1080 / (v.height * 1920) - 1.6) < 1e-4 && abs(v.midY - 0.5) < 1e-6,
+          "9:16: a wide recording is a centred band with 8% padding at the sides")
+    lay.output.setShape(.square)
+    let sq = FrameLayout.contentRect(project: lay, mode: .normal)
+    check(abs(sq.minX - 0.08) < 1e-6 && abs(sq.midY - 0.5) < 1e-6, "1:1: 8% padding at the sides, centred")
+    lay.output.setShape(.wide)
+    let wd = FrameLayout.contentRect(project: lay, mode: .normal)
+    check(abs(wd.minY - 0.08) < 1e-6, "16:9: padding unchanged (8% above and below)")
+    lay.crop = CropRect(x: 0, y: 0, width: 450, height: 900)   // a tall crop (1:2) in a vertical video
+    lay.output.setShape(.vertical)
+    let cr = FrameLayout.contentRect(project: lay, mode: .normal)
+    check(abs(cr.width * 1080 / (cr.height * 1920) - 0.5) < 1e-4 && abs(cr.minY - 0.08 * 1080 / 1920) < 1e-6,
+          "9:16 with a tall crop: the cropped part keeps its shape and fills the height")
+
+    // Real exports of each shape: MP4 1080p and GIF 480p.
+    let source = tmp.appendingPathComponent("shape-source.mov")
+    try await TestVideo.make(at: source, width: 1440, height: 900, seconds: 1, fps: 30)
+    let info = try await VideoInfo.load(source)
+    for shape in VideoShape.allCases {
+        var p = Project(source: info.sourceVideo)
+        p.output.setShape(shape); p.output.setMP4Height(1080); p.output.fps = 30
+        let url = tmp.appendingPathComponent("shape-\(shape.rawValue).mp4")
+        try await Exporter().export(project: p, sourceURL: source, to: url) { _ in }
+        let size = try await AVURLAsset(url: url).loadTracks(withMediaType: .video)[0].load(.naturalSize)
+        let want = OutputSettings.size(level: 1080, shape: shape)
+        check(size == CGSize(width: want.width, height: want.height), "MP4 \(shape.ratioLabel) 1080p is \(Int(size.width))×\(Int(size.height))")
+        p.output.format = .gif; p.output.gifHeight = 480; p.output.gifFPS = 10
+        let gif = tmp.appendingPathComponent("shape-\(shape.rawValue).gif")
+        let est = try await Exporter().estimateGIF(project: p, sourceURL: source)
+        try await Exporter().export(project: p, sourceURL: source, to: gif) { _ in }
+        let actual = (try FileManager.default.attributesOfItem(atPath: gif.path)[.size] as? Int) ?? 0
+        let img = CGImageSourceCreateWithURL(gif as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+        let g = p.output.gifSize
+        check(img?.width == g.width && img?.height == g.height && est.bytes > actual / 2 && est.bytes < actual * 2,
+              "GIF \(shape.ratioLabel) 480p is \(img?.width ?? 0)×\(img?.height ?? 0), size guess \(est.bytes / 1024) KB vs \(actual / 1024) KB")
+    }
 }
 
 // Speed test, only when asked: VET_PERF=1 swift run -c release CoreChecks (makes a 4K, 30 s test recording).
